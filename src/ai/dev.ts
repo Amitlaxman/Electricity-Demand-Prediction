@@ -1,1 +1,5 @@
-// Flows will be imported for their side effects in this file.
+import { config } from 'dotenv';
+config();
+
+import '@/ai/flows/enhance-forecast-with-summary.ts';
+import '@/ai/flows/smart-model-selection.ts';
