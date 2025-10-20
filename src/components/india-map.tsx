@@ -87,25 +87,33 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
         }),
         controls: [],
       });
+      
+      // DEFER CLICK LISTENER ATTACHMENT
+      const featuresLoadedListener = vectorSource.on('featuresloadend', () => {
+        if (!mapInstance.current) return;
 
-      mapInstance.current.on('click', (evt) => {
-        let stateName = 'Unknown';
-        mapInstance.current?.forEachFeatureAtPixel(
-          evt.pixel,
-          (feature) => {
-            if (feature && feature.get('st_nm')) {
-              stateName = feature.get('st_nm');
-              return true; // Stop iterating
+        mapInstance.current.on('click', (evt) => {
+          let stateName = 'Unknown';
+          const map = mapInstance.current;
+          if (!map) return;
+
+          map.forEachFeatureAtPixel(
+            evt.pixel,
+            (feature) => {
+              if (feature && feature.get('st_nm')) {
+                stateName = feature.get('st_nm');
+                return true; // Stop iterating
+              }
+              return false;
+            },
+            {
+              layerFilter: (layer) => layer === vectorLayer.current,
             }
-            return false;
-          },
-          {
-            layerFilter: (layer) => layer === vectorLayer.current,
-          }
-        );
-
-        const coords = toLonLat(evt.coordinate);
-        onLocationSelect({ lat: coords[1], lng: coords[0], state: stateName });
+          );
+  
+          const coords = toLonLat(evt.coordinate);
+          onLocationSelect({ lat: coords[1], lng: coords[0], state: stateName });
+        });
       });
     }
 
