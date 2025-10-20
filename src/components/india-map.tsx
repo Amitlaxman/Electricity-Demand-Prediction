@@ -88,7 +88,6 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
         controls: [],
       });
       
-      // DEFER CLICK LISTENER ATTACHMENT
       const featuresLoadedListener = vectorSource.on('featuresloadend', () => {
         if (!mapInstance.current) return;
 
