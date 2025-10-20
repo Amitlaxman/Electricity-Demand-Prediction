@@ -135,8 +135,8 @@ export default function Home() {
           </SidebarTrigger>
         </header>
 
-        <main className="relative flex flex-1 flex-col">
-          <div className="relative flex-1">
+        <main className="relative flex flex-1 flex-col overflow-hidden">
+          <div className="absolute inset-0">
             <IndiaMap onLocationSelect={handleLocationSelect} lat={lat} lon={lon} />
           </div>
           <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-background/80 via-background/50 to-transparent p-4 backdrop-blur-sm">
