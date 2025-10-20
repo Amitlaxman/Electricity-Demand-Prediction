@@ -9,7 +9,7 @@ import GeoJSON from 'ol/format/GeoJSON';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import { fromLonLat, toLonLat } from 'ol/proj';
-import { Stroke, Style, Icon } from 'ol/style';
+import { Stroke, Style, Icon }from 'ol/style';
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
 
@@ -33,7 +33,6 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
   const initialCenter = fromLonLat([82.7, 23.5]);
   const initialZoom = 4.5;
   
-  // A more constrained extent for mainland India
   const viewExtent = fromLonLat([68, 8]).concat(fromLonLat([98, 37]));
 
 
@@ -93,7 +92,6 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
         const feature = mapInstance.current?.forEachFeatureAtPixel(
           evt.pixel,
           (feature) => {
-            // Ensure it's a state feature from our vector layer
             if (feature.get('NAME_1')) { 
               return feature;
             }
@@ -104,7 +102,6 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
         );
 
         const coords = toLonLat(evt.coordinate);
-        // Use NAME_1 from the new GeoJSON source
         const stateName = feature?.get('NAME_1') || 'Unknown';
         onLocationSelect({ lat: coords[1], lng: coords[0], state: stateName });
       });
@@ -112,55 +109,24 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
   }, [onLocationSelect, viewExtent, initialCenter, initialZoom]);
 
   useEffect(() => {
-    if (!vectorLayer.current) return;
+    if (!mapInstance.current || !vectorLayer.current) return;
     const vectorSource = vectorLayer.current.getSource();
     if (!vectorSource) return;
-
-    // Wait for features to be loaded before styling
-    vectorSource.on('featuresloadend', (event) => {
-      const highlightStyle = new Style({
-        stroke: new Stroke({ color: '#ffa500', width: 2 })
-      });
-      const defaultStyle = new Style({
-        stroke: new Stroke({ color: '#003c88', width: 1 })
-      });
-
-      event.features.forEach((feature) => {
-        if (feature.get('NAME_1') === selectedState) {
-          feature.setStyle(highlightStyle);
-        } else {
-          feature.setStyle(defaultStyle);
-        }
-      });
-    });
-
-    // Also apply styles to already loaded features
-    const features = vectorSource.getFeatures();
+  
     const highlightStyle = new Style({
       stroke: new Stroke({ color: '#ffa500', width: 2 })
     });
     const defaultStyle = new Style({
       stroke: new Stroke({ color: '#003c88', width: 1 })
     });
-
-    features.forEach(feature => {
-      if (feature.get('NAME_1') === selectedState) {
-        feature.setStyle(highlightStyle);
-      } else {
-        feature.setStyle(defaultStyle);
-      }
-    });
-
-  }, [selectedState]);
-
-  useEffect(() => {
-    if (!mapInstance.current || !vectorLayer.current) return;
-    const vectorSource = vectorLayer.current.getSource();
-    if (!vectorSource) return;
-
+  
+    // Reset all features to default style first
+    vectorSource.getFeatures().forEach(f => f.setStyle(defaultStyle));
+  
     if (selectedState && selectedState !== 'Unknown') {
       const stateFeature = vectorSource.getFeatures().find(f => f.get('NAME_1') === selectedState);
       if (stateFeature) {
+        stateFeature.setStyle(highlightStyle);
         const extent = stateFeature.getGeometry()?.getExtent();
         if (extent) {
           mapInstance.current.getView().fit(extent, {
@@ -171,13 +137,12 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
         }
       }
     } else {
-        mapInstance.current.getView().animate({
-            center: initialCenter,
-            zoom: initialZoom,
-            duration: 1000,
-        });
+      mapInstance.current.getView().animate({
+        center: initialCenter,
+        zoom: initialZoom,
+        duration: 1000,
+      });
     }
-
   }, [selectedState, initialCenter, initialZoom]);
 
 
