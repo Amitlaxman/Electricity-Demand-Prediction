@@ -105,11 +105,11 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
 
         const coords = toLonLat(evt.coordinate);
         // Use NAME_1 from the new GeoJSON source
-        const stateName = feature?.get('NAME_1') || selectedState || 'Unknown';
+        const stateName = feature?.get('NAME_1') || 'Unknown';
         onLocationSelect({ lat: coords[1], lng: coords[0], state: stateName });
       });
     }
-  }, [onLocationSelect, selectedState, initialCenter, viewExtent]);
+  }, [onLocationSelect, viewExtent]);
 
   useEffect(() => {
     if (mapInstance.current && selectedState) {
@@ -128,41 +128,44 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
             }),
         });
 
-        const listener = vectorSource.on('featuresloadend', function(event) {
-          event.features.forEach(feature => {
-              if (feature.get('NAME_1') === selectedState) {
-                  feature.setStyle(highlightStyle);
-                  const extent = feature.getGeometry()?.getExtent();
-                  if (extent) {
-                      mapInstance.current?.getView().fit(extent, {
-                          padding: [50, 50, 50, 50],
-                          duration: 1000,
-                          maxZoom: 7,
-                      });
-                  }
-              } else {
-                  feature.setStyle(defaultStyle);
-              }
-          });
-        });
-        
-        // In case features are already loaded
-        vectorSource.getFeatures().forEach(feature => {
-            if (feature.get('NAME_1') === selectedState) {
-                feature.setStyle(highlightStyle);
-                const extent = feature.getGeometry()?.getExtent();
-                if (extent) {
-                    mapInstance.current?.getView().fit(extent, {
-                        padding: [50, 50, 50, 50],
-                        duration: 1000,
-                        maxZoom: 7,
-                    });
+        const applyStyles = (features: Feature[]) => {
+            let stateFound = false;
+            features.forEach(feature => {
+                if (feature.get('NAME_1') === selectedState) {
+                    feature.setStyle(highlightStyle);
+                    const extent = feature.getGeometry()?.getExtent();
+                    if (extent) {
+                        mapInstance.current?.getView().fit(extent, {
+                            padding: [50, 50, 50, 50],
+                            duration: 1000,
+                            maxZoom: 7,
+                        });
+                    }
+                    stateFound = true;
+                } else {
+                    feature.setStyle(defaultStyle);
                 }
-            } else {
-                feature.setStyle(defaultStyle);
-            }
-        });
+            });
 
+            if (!stateFound && selectedState === 'Unknown') {
+                 mapInstance.current?.getView().animate({
+                    center: initialCenter,
+                    zoom: initialZoom,
+                    duration: 1000
+                });
+            }
+        };
+
+        if (vectorSource) {
+            const features = vectorSource.getFeatures();
+            if (features.length > 0) {
+                applyStyles(features);
+            } else {
+                vectorSource.on('featuresloadend', function(event) {
+                    applyStyles(event.features);
+                });
+            }
+        }
     } else if (mapInstance.current) {
         const defaultStyle = new Style({
             stroke: new Stroke({
@@ -171,14 +174,16 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
             }),
         });
         const vectorSource = vectorLayer.current?.getSource();
-        const listener = vectorSource.on('featuresloadend', function(event) {
-            event.features.forEach(feature => {
-              feature.setStyle(defaultStyle);
+        if (vectorSource) {
+            const listener = vectorSource.on('featuresloadend', function(event) {
+                event.features.forEach(feature => {
+                  feature.setStyle(defaultStyle);
+                });
             });
-        });
-        vectorSource.getFeatures().forEach(feature => {
-            feature.setStyle(defaultStyle);
-        });
+            vectorSource.getFeatures().forEach(feature => {
+                feature.setStyle(defaultStyle);
+            });
+        }
 
         mapInstance.current?.getView().animate({
             center: initialCenter,
