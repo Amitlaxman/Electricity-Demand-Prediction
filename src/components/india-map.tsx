@@ -89,12 +89,15 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
       });
 
       mapInstance.current.on('click', (evt) => {
-        const feature = mapInstance.current?.forEachFeatureAtPixel(
+        let stateName = 'Unknown';
+        mapInstance.current?.forEachFeatureAtPixel(
           evt.pixel,
           (feature) => {
             if (feature.get('NAME_1')) { 
-              return feature;
+              stateName = feature.get('NAME_1');
+              return true; // Stop iterating
             }
+            return false;
           },
           {
             layerFilter: (layer) => layer === vectorLayer.current,
@@ -102,7 +105,6 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
         );
 
         const coords = toLonLat(evt.coordinate);
-        const stateName = feature?.get('NAME_1') || 'Unknown';
         onLocationSelect({ lat: coords[1], lng: coords[0], state: stateName });
       });
     }
@@ -120,7 +122,6 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
       stroke: new Stroke({ color: '#003c88', width: 1 })
     });
   
-    // This logic runs when the source has finished loading features.
     const onFeaturesLoadEnd = () => {
         vectorSource.getFeatures().forEach(f => f.setStyle(defaultStyle));
     
@@ -146,20 +147,11 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
         }
     };
 
-    // Handle already loaded features
     if (vectorSource.getState() === 'ready') {
         onFeaturesLoadEnd();
     } else {
-        // Handle features loading for the first time
-        vectorSource.on('featuresloadend', onFeaturesLoadEnd);
+        vectorSource.once('featuresloadend', onFeaturesLoadEnd);
     }
-
-    // Cleanup listener on component unmount or when source changes
-    return () => {
-        if(vectorSource.getState() !== 'ready') {
-            vectorSource.un('featuresloadend', onFeaturesLoadEnd);
-        }
-    };
 
   }, [selectedState, initialCenter, initialZoom]);
 
