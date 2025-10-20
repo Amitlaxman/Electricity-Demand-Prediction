@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useRef } from 'react';
@@ -31,9 +32,9 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
   const vectorLayer = useRef<VectorLayer<any> | null>(null);
   const markerLayer = useRef<VectorLayer<any> | null>(null);
 
-  const initialCenter = fromLonLat([82.7, 23.5]); // Centered on mainland India
+  const initialCenter = fromLonLat([82.7, 23.5]);
   const initialZoom = 4.5;
-  const viewExtent = fromLonLat([68, 6], 'EPSG:4326').concat(fromLonLat([98, 37], 'EPSG:4326'));
+  const viewExtent = fromLonLat([68, 6]).concat(fromLonLat([98, 37]));
 
 
   useEffect(() => {
@@ -47,7 +48,6 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
       });
 
       const defaultStyle = new Style({
-        // fill is removed to make it transparent
         stroke: new Stroke({
           color: '#003c88',
           width: 1,
@@ -121,7 +121,6 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
             }),
           });
         const defaultStyle = new Style({
-            // fill removed
             stroke: new Stroke({
               color: '#003c88',
               width: 1,
@@ -144,6 +143,15 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
             }
         });
     } else if (mapInstance.current) {
+        const defaultStyle = new Style({
+            stroke: new Stroke({
+              color: '#003c88',
+              width: 1,
+            }),
+        });
+        vectorLayer.current?.getSource()?.getFeatures().forEach(feature => {
+            feature.setStyle(defaultStyle);
+        });
         mapInstance.current?.getView().animate({
             center: initialCenter,
             zoom: initialZoom,
