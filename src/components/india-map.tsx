@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Map, View } from 'ol';
 import TileLayer from 'ol/layer/Tile';
 import OSM from 'ol/source/OSM';
@@ -31,8 +31,10 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
   const vectorLayer = useRef<VectorLayer<any> | null>(null);
   const markerLayer = useRef<VectorLayer<any> | null>(null);
 
-  const initialCenter = fromLonLat([78.9629, 20.5937]);
-  const initialZoom = 5;
+  const initialCenter = fromLonLat([82.7, 23.5]); // Centered on mainland India
+  const initialZoom = 4.5;
+  const viewExtent = fromLonLat([68, 6], 'EPSG:4326').concat(fromLonLat([98, 37], 'EPSG:4326'));
+
 
   useEffect(() => {
     if (mapRef.current && !mapInstance.current) {
@@ -45,9 +47,7 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
       });
 
       const defaultStyle = new Style({
-        fill: new Fill({
-          color: 'rgba(0, 60, 136, 0.2)',
-        }),
+        // fill is removed to make it transparent
         stroke: new Stroke({
           color: '#003c88',
           width: 1,
@@ -85,6 +85,8 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
         view: new View({
           center: initialCenter,
           zoom: initialZoom,
+          extent: viewExtent,
+          constrainOnlyCenter: true,
         }),
         controls: [],
       });
@@ -92,7 +94,11 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
       mapInstance.current.on('click', (evt) => {
         const feature = mapInstance.current?.forEachFeatureAtPixel(
           evt.pixel,
-          (feature) => feature
+          (feature) => {
+            if (feature.get('name')) { // Ensure it's a state feature
+              return feature;
+            }
+          }
         );
 
         const coords = toLonLat(evt.coordinate);
@@ -100,7 +106,7 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
         onLocationSelect({ lat: coords[1], lng: coords[0], state: stateName });
       });
     }
-  }, [onLocationSelect, selectedState]);
+  }, [onLocationSelect, selectedState, initialCenter, viewExtent]);
 
   useEffect(() => {
     if (mapInstance.current && selectedState) {
@@ -115,9 +121,7 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
             }),
           });
         const defaultStyle = new Style({
-            fill: new Fill({
-              color: 'rgba(0, 60, 136, 0.2)',
-            }),
+            // fill removed
             stroke: new Stroke({
               color: '#003c88',
               width: 1,
@@ -132,6 +136,7 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
                     mapInstance.current?.getView().fit(extent, {
                         padding: [50, 50, 50, 50],
                         duration: 1000,
+                        maxZoom: 6,
                     });
                 }
             } else {
@@ -145,7 +150,7 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
             duration: 1000
         });
     }
-  }, [selectedState]);
+  }, [selectedState, initialCenter, initialZoom]);
 
   useEffect(() => {
     if (markerLayer.current) {
@@ -156,16 +161,8 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
       });
       markerSource.addFeature(marker);
     }
-
-    // Only pan if not zooming to a state
-    if (mapInstance.current && !selectedState) {
-        mapInstance.current.getView().animate({
-            center: fromLonLat([lon, lat]),
-            duration: 500
-        })
-    }
-
-  }, [lat, lon, selectedState]);
+    
+  }, [lat, lon]);
 
   return <div ref={mapRef} style={{ height: '100%', width: '100%' }} />;
 }
