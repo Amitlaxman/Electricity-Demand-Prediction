@@ -1,18 +1,18 @@
 'use client';
 
-import * as React from 'react';
-import { MapContainer, TileLayer, GeoJSON, Marker, useMap, useMapEvents } from 'react-leaflet';
-import type { Map } from 'leaflet';
-import L from 'leaflet';
-import { indiaStatesGeoJSON } from '@/lib/india-states-geojson';
+import React, { useEffect, useRef, useState } from 'react';
+import { Map, View } from 'ol';
+import TileLayer from 'ol/layer/Tile';
+import OSM from 'ol/source/OSM';
+import GeoJSON from 'ol/format/GeoJSON';
+import VectorLayer from 'ol/layer/Vector';
+import VectorSource from 'ol/source/Vector';
+import { fromLonLat, toLonLat } from 'ol/proj';
+import { Fill, Stroke, Style, Icon } from 'ol/style';
+import Feature from 'ol/Feature';
+import Point from 'ol/geom/Point';
 
-// Fix for default Leaflet icon not showing up
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
+import { indiaStatesGeoJSON } from '@/lib/india-states-geojson';
 
 interface IndiaMapProps {
   onLocationSelect: (location: {
@@ -25,118 +25,147 @@ interface IndiaMapProps {
   selectedState: string | null;
 }
 
-const getBoundingBox = (feature: any) => {
-  if (!feature) return null;
-  return L.geoJSON(feature).getBounds();
-};
-
-function MapController({ selectedState, lat, lon }: { selectedState: string | null, lat: number, lon: number }) {
-  const map = useMap();
-
-  React.useEffect(() => {
-    if (selectedState) {
-      const feature = indiaStatesGeoJSON.features.find(
-        (f: any) => f.properties.name === selectedState
-      );
-      if (feature) {
-        const bounds = getBoundingBox(feature);
-        if (bounds) {
-          map.fitBounds(bounds);
-        }
-      }
-    } else {
-      map.setView([20.5937, 78.9629], 5);
-    }
-  }, [selectedState, map]);
-  
-  React.useEffect(() => {
-    const markerLatLng = L.latLng(lat, lon);
-    // Don't pan if the state is selected, as fitBounds is already handling the view.
-    if (!selectedState && !map.getBounds().contains(markerLatLng)) {
-        map.panTo(markerLatLng);
-    }
-  }, [lat, lon, map, selectedState]);
-
-
-  return null;
-}
-
-
 export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMapProps) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstance = useRef<Map | null>(null);
+  const vectorLayer = useRef<VectorLayer<any> | null>(null);
+  const markerLayer = useRef<VectorLayer<any> | null>(null);
 
-  const onEachFeature = (feature: any, layer: any) => {
-    layer.on({
-      click: (e: L.LeafletMouseEvent) => {
-        L.DomEvent.stopPropagation(e); 
-        onLocationSelect({
-          lat: e.latlng.lat,
-          lng: e.latlng.lng,
-          state: feature.properties.name,
+  const initialCenter = fromLonLat([78.9629, 20.5937]);
+  const initialZoom = 5;
+
+  useEffect(() => {
+    if (mapRef.current && !mapInstance.current) {
+      const geoJsonFormat = new GeoJSON({
+        featureProjection: 'EPSG:3857',
+      });
+
+      const vectorSource = new VectorSource({
+        features: geoJsonFormat.readFeatures(indiaStatesGeoJSON),
+      });
+
+      const defaultStyle = new Style({
+        fill: new Fill({
+          color: 'rgba(0, 60, 136, 0.2)',
+        }),
+        stroke: new Stroke({
+          color: '#003c88',
+          width: 1,
+        }),
+      });
+
+      vectorLayer.current = new VectorLayer({
+        source: vectorSource,
+        style: defaultStyle,
+      });
+
+      const markerSource = new VectorSource();
+      markerLayer.current = new VectorLayer({
+        source: markerSource,
+        style: new Style({
+          image: new Icon({
+            anchor: [0.5, 1],
+            src: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+            scale: 0.8,
+            anchorXUnits: 'fraction',
+            anchorYUnits: 'fraction',
+          }),
+        }),
+      });
+      
+      mapInstance.current = new Map({
+        target: mapRef.current,
+        layers: [
+          new TileLayer({
+            source: new OSM(),
+          }),
+          vectorLayer.current,
+          markerLayer.current,
+        ],
+        view: new View({
+          center: initialCenter,
+          zoom: initialZoom,
+        }),
+        controls: [],
+      });
+
+      mapInstance.current.on('click', (evt) => {
+        const feature = mapInstance.current?.forEachFeatureAtPixel(
+          evt.pixel,
+          (feature) => feature
+        );
+
+        const coords = toLonLat(evt.coordinate);
+        const stateName = feature?.get('name') || selectedState || 'Unknown';
+        onLocationSelect({ lat: coords[1], lng: coords[0], state: stateName });
+      });
+    }
+  }, [onLocationSelect, selectedState]);
+
+  useEffect(() => {
+    if (mapInstance.current && selectedState) {
+        const vectorSource = vectorLayer.current?.getSource();
+        const highlightStyle = new Style({
+            fill: new Fill({
+              color: 'rgba(255, 165, 0, 0.4)',
+            }),
+            stroke: new Stroke({
+              color: '#ffa500',
+              width: 2,
+            }),
+          });
+        const defaultStyle = new Style({
+            fill: new Fill({
+              color: 'rgba(0, 60, 136, 0.2)',
+            }),
+            stroke: new Stroke({
+              color: '#003c88',
+              width: 1,
+            }),
         });
-      },
-    });
-  };
 
-  const MapClickHandler = () => {
-    useMapEvents({
-      click: (e) => {
-        const { lat, lng } = e.latlng;
-        let stateName = '';
-        
-        // This is a simplified check. A proper point-in-polygon check would be more robust.
-        const gjLayer = L.geoJSON(indiaStatesGeoJSON);
-        gjLayer.eachLayer((layer: any) => {
-            if (layer.getBounds().contains(e.latlng)) {
-                if (stateName === '') { // Prioritize the first match
-                    stateName = layer.feature.properties.name;
+        vectorSource?.getFeatures().forEach(feature => {
+            if (feature.get('name') === selectedState) {
+                feature.setStyle(highlightStyle);
+                const extent = feature.getGeometry()?.getExtent();
+                if (extent) {
+                    mapInstance.current?.getView().fit(extent, {
+                        padding: [50, 50, 50, 50],
+                        duration: 1000,
+                    });
                 }
+            } else {
+                feature.setStyle(defaultStyle);
             }
         });
+    } else if (mapInstance.current) {
+        mapInstance.current?.getView().animate({
+            center: initialCenter,
+            zoom: initialZoom,
+            duration: 1000
+        });
+    }
+  }, [selectedState]);
 
-        onLocationSelect({ lat, lng, state: stateName || selectedState || 'Unknown' });
-      }
-    });
+  useEffect(() => {
+    if (markerLayer.current) {
+      const markerSource = markerLayer.current.getSource();
+      markerSource.clear();
+      const marker = new Feature({
+        geometry: new Point(fromLonLat([lon, lat])),
+      });
+      markerSource.addFeature(marker);
+    }
 
-    return null;
-  }
+    // Only pan if not zooming to a state
+    if (mapInstance.current && !selectedState) {
+        mapInstance.current.getView().animate({
+            center: fromLonLat([lon, lat]),
+            duration: 500
+        })
+    }
 
-  const geoJsonStyle = {
-    fillColor: "hsl(var(--primary))",
-    fillOpacity: 0.2,
-    color: "hsl(var(--primary))",
-    weight: 1,
-  };
-  
-  const highlightStyle = {
-    fillColor: "hsl(var(--accent))",
-    fillOpacity: 0.4,
-    color: "hsl(var(--accent))",
-    weight: 2,
-  };
+  }, [lat, lon, selectedState]);
 
-  return (
-    <MapContainer
-      key="india-map-container"
-      center={[20.5937, 78.9629]}
-      zoom={5}
-      style={{ height: '100%', width: '100%', backgroundColor: 'hsl(var(--background))' }}
-      scrollWheelZoom={true}
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      <GeoJSON 
-        key={selectedState} 
-        data={indiaStatesGeoJSON as any} 
-        onEachFeature={onEachFeature} 
-        style={(feature) => {
-            return feature?.properties.name === selectedState ? highlightStyle : geoJsonStyle;
-        }}
-      />
-      <Marker position={[lat, lon]} />
-      <MapController selectedState={selectedState} lat={lat} lon={lon} />
-      <MapClickHandler />
-    </MapContainer>
-  );
+  return <div ref={mapRef} style={{ height: '100%', width: '100%' }} />;
 }
