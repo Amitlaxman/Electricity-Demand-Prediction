@@ -112,52 +112,72 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
   }, [onLocationSelect, viewExtent, initialCenter, initialZoom]);
 
   useEffect(() => {
-    if (!mapInstance.current || !vectorLayer.current) return;
-
+    if (!vectorLayer.current) return;
     const vectorSource = vectorLayer.current.getSource();
     if (!vectorSource) return;
 
-    const highlightStyle = new Style({
-      stroke: new Stroke({
-        color: '#ffa500',
-        width: 2,
-      }),
-    });
-    const defaultStyle = new Style({
-      stroke: new Stroke({
-        color: '#003c88',
-        width: 1,
-      }),
+    // Wait for features to be loaded before styling
+    vectorSource.on('featuresloadend', (event) => {
+      const highlightStyle = new Style({
+        stroke: new Stroke({ color: '#ffa500', width: 2 })
+      });
+      const defaultStyle = new Style({
+        stroke: new Stroke({ color: '#003c88', width: 1 })
+      });
+
+      event.features.forEach((feature) => {
+        if (feature.get('NAME_1') === selectedState) {
+          feature.setStyle(highlightStyle);
+        } else {
+          feature.setStyle(defaultStyle);
+        }
+      });
     });
 
+    // Also apply styles to already loaded features
     const features = vectorSource.getFeatures();
-    let stateFeature: Feature | undefined;
+    const highlightStyle = new Style({
+      stroke: new Stroke({ color: '#ffa500', width: 2 })
+    });
+    const defaultStyle = new Style({
+      stroke: new Stroke({ color: '#003c88', width: 1 })
+    });
 
     features.forEach(feature => {
       if (feature.get('NAME_1') === selectedState) {
         feature.setStyle(highlightStyle);
-        stateFeature = feature;
       } else {
         feature.setStyle(defaultStyle);
       }
     });
 
-    if (stateFeature) {
-      const extent = stateFeature.getGeometry()?.getExtent();
-      if (extent) {
-        mapInstance.current?.getView().fit(extent, {
-          padding: [50, 50, 50, 50],
-          duration: 1000,
-          maxZoom: 7,
-        });
+  }, [selectedState]);
+
+  useEffect(() => {
+    if (!mapInstance.current || !vectorLayer.current) return;
+    const vectorSource = vectorLayer.current.getSource();
+    if (!vectorSource) return;
+
+    if (selectedState && selectedState !== 'Unknown') {
+      const stateFeature = vectorSource.getFeatures().find(f => f.get('NAME_1') === selectedState);
+      if (stateFeature) {
+        const extent = stateFeature.getGeometry()?.getExtent();
+        if (extent) {
+          mapInstance.current.getView().fit(extent, {
+            padding: [50, 50, 50, 50],
+            duration: 1000,
+            maxZoom: 7,
+          });
+        }
       }
-    } else if (!selectedState || selectedState === 'Unknown') {
-      mapInstance.current?.getView().animate({
-        center: initialCenter,
-        zoom: initialZoom,
-        duration: 1000,
-      });
+    } else {
+        mapInstance.current.getView().animate({
+            center: initialCenter,
+            zoom: initialZoom,
+            duration: 1000,
+        });
     }
+
   }, [selectedState, initialCenter, initialZoom]);
 
 
