@@ -123,7 +123,7 @@ export default function Home() {
         </PageForm>
       </Sidebar>
       <SidebarInset>
-        <header className="flex h-12 items-center justify-between border-b bg-card p-2 md:hidden">
+        <header className="flex h-12 shrink-0 items-center justify-between border-b bg-card p-2 md:hidden">
           <div className="flex items-center gap-2">
             <IndiaGate className="h-6 w-6 text-primary" />
             <h1 className="text-lg font-semibold font-headline">
@@ -135,8 +135,10 @@ export default function Home() {
           </SidebarTrigger>
         </header>
 
-        <main className="relative flex-1">
-          <IndiaMap onLocationSelect={handleLocationSelect} lat={lat} lon={lon} />
+        <main className="relative flex flex-1 flex-col">
+          <div className="relative flex-1">
+            <IndiaMap onLocationSelect={handleLocationSelect} lat={lat} lon={lon} />
+          </div>
           <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-background/80 via-background/50 to-transparent p-4 backdrop-blur-sm">
               {state.data ? (
                   <ForecastDisplay result={state.data} />
