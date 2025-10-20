@@ -134,10 +134,8 @@ export default function Home() {
                 IndiaForecaster
               </h1>
             </div>
-            <SidebarTrigger asChild>
-              <Button size="icon" variant="outline">
+            <SidebarTrigger size="icon" variant="outline">
                 <MapPinned />
-              </Button>
             </SidebarTrigger>
           </header>
 

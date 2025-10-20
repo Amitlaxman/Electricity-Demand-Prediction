@@ -19,7 +19,7 @@ interface IndiaMapProps {
   lon: number;
 }
 
-const Polygon = (props: google.maps.PolygonOptions) => {
+const Polygon = (props: google.maps.PolygonOptions & { onClick: () => void }) => {
   const map = useMap();
   const [polygon, setPolygon] = React.useState<google.maps.Polygon | null>(null);
 
@@ -27,8 +27,10 @@ const Polygon = (props: google.maps.PolygonOptions) => {
     if (map) {
       const p = new google.maps.Polygon(props);
       p.setMap(map);
+      google.maps.event.addListener(p, 'click', props.onClick);
       setPolygon(p);
       return () => {
+        google.maps.event.clearInstanceListeners(p);
         p.setMap(null);
       };
     }
@@ -48,8 +50,9 @@ export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
 
   const handleMapClick = (e: google.maps.MapMouseEvent) => {
     if (e.latLng) {
-      const { lat, lng } = e.latLng;
-      const point = new google.maps.LatLng(lat(), lng());
+      const clickedLat = e.latLng.lat();
+      const clickedLng = e.latLng.lng();
+      const point = new google.maps.LatLng(clickedLat, clickedLng);
       let selectedState = 'Unknown';
 
       for (const feature of indiaStatesGeoJSON.features) {
@@ -62,7 +65,7 @@ export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
           break;
         }
       }
-      onLocationSelect({ lat: lat(), lng: lng(), state: selectedState });
+      onLocationSelect({ lat: clickedLat, lng: clickedLng, state: selectedState });
     }
   };
 
@@ -78,7 +81,7 @@ export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
         mapId={'a2f3bdeec493efe'}
         onClick={handleMapClick}
       >
-        <AdvancedMarker position={{ lat, lng }}>
+        <AdvancedMarker position={{ lat, lng: lon }}>
           <Pin
             background={'hsl(var(--primary))'}
             borderColor={'hsl(var(--primary-foreground))'}
