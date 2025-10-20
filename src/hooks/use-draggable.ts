@@ -12,15 +12,17 @@ export function useDraggable(initialPosition: {x: number, y: number}, constraint
     
     const startX = x.get();
     const startY = y.get();
+    const panelElement = event.currentTarget as HTMLElement;
+    const panelWidth = panelElement.offsetWidth;
+    const panelHeight = panelElement.offsetHeight;
+
 
     const onPointerMove = (moveEvent: PointerEvent) => {
         const deltaX = moveEvent.clientX - event.clientX;
         const deltaY = moveEvent.clientY - event.clientY;
 
-        const { left, top, width, height } = constraintsRef.current!.getBoundingClientRect();
-        const panelWidth = (event.currentTarget as HTMLElement).offsetWidth;
-        const panelHeight = (event.currentTarget as HTMLElement).offsetHeight;
-
+        const { width, height } = constraintsRef.current!.getBoundingClientRect();
+        
         const newX = Math.min(Math.max(startX + deltaX, 0), width - panelWidth);
         const newY = Math.min(Math.max(startY + deltaY, 0), height - panelHeight);
 
