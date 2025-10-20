@@ -88,12 +88,13 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
         const gjLayer = L.geoJSON(indiaStatesGeoJSON);
         gjLayer.eachLayer((layer: any) => {
           const feature = layer.feature;
-          const poly = L.geoJSON(feature);
-          // A proper point-in-polygon check would be better here.
-          // For this demo, we can use a library if needed, or rely on the onEachFeature click.
-          // For now, we find the containing bounds.
-          if (poly.getBounds().contains(e.latlng)) {
-            stateName = feature.properties.name;
+          // This is a simple check. For better accuracy, a point-in-polygon library would be ideal.
+          if (layer.getBounds().contains(e.latlng)) {
+              const poly = L.geoJSON(feature);
+              // A more precise check, though still not perfect for complex shapes.
+              if (poly.getBounds().contains(e.latlng)) {
+                stateName = feature.properties.name;
+              }
           }
         });
 
@@ -125,11 +126,11 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
 
   return (
     <MapContainer
+      key="india-map-container"
       center={[20.5937, 78.9629]}
       zoom={5}
       style={{ height: '100%', width: '100%', backgroundColor: 'hsl(var(--background))' }}
       scrollWheelZoom={true}
-      key="india-map-container"
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
