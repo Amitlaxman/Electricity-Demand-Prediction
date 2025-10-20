@@ -38,7 +38,7 @@ const getBoundingBox = (geometry: any) => {
     if (geometry.type === 'Polygon') {
         geometry.coordinates.forEach(processCoordinates);
     } else if (geometry.type === 'MultiPolygon') {
-        geometry.coordinates.forEach(poly => poly.forEach(processCoordinates));
+        geometry.coordinates.forEach((poly: any) => poly.forEach(processCoordinates));
     }
 
     return { minX, minY, maxX, maxY };
@@ -48,11 +48,20 @@ const getBoundingBox = (geometry: any) => {
 export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
   const [viewBox, setViewBox] = React.useState(INITIAL_VIEWBOX);
   const [isZoomed, setIsZoomed] = React.useState(false);
+  const [selectedState, setSelectedState] = React.useState<string | null>(null);
   const svgRef = React.useRef<SVGSVGElement>(null);
 
   const handleStateClick = (feature: any, e: React.MouseEvent) => {
     e.stopPropagation();
     const { name, center } = feature.properties;
+    
+    if (selectedState === name) {
+        // If already zoomed in on this state, handle as a map click for precise location
+        handleMapClick(e);
+        return;
+    }
+
+    setSelectedState(name);
     
     // Calculate bounding box and set new viewBox for zoom
     const bbox = getBoundingBox(feature.geometry);
@@ -60,7 +69,6 @@ export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
     const width = bbox.maxX - bbox.minX + padding * 2;
     const height = bbox.maxY - bbox.minY + padding * 2;
     
-    // Ensure width and height are not zero
     if (width > 0 && height > 0) {
       const newViewBox = `${bbox.minX - padding} ${bbox.minY - padding} ${width} ${height}`;
       setViewBox(newViewBox);
@@ -79,7 +87,7 @@ export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
     point.y = e.clientY;
     const transformedPoint = point.matrixTransform(svg.getScreenCTM()?.inverse());
     
-    let stateName = "Unknown";
+    let stateName = selectedState || "Unknown";
     const targetPath = e.target as SVGPathElement;
     if (targetPath.dataset.name) {
       stateName = targetPath.dataset.name;
@@ -120,6 +128,7 @@ export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
   const resetView = () => {
     setViewBox(INITIAL_VIEWBOX);
     setIsZoomed(false);
+    setSelectedState(null);
   }
 
   const pinScale = isZoomed ? 0.05 : 0.25;
@@ -141,33 +150,37 @@ export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
             ref={svgRef}
             viewBox={viewBox}
             className="h-full w-full cursor-pointer transition-all duration-500"
-            onClick={handleMapClick}
+            onClick={isZoomed ? handleMapClick : (e) => e.stopPropagation()}
         >
-            {indiaStatesGeoJSON.features.map(feature => (
-                <path
-                key={feature.properties.name}
-                data-name={feature.properties.name}
-                d={createPath(feature.geometry)}
-                className="fill-primary/20 stroke-primary/80 transition-all hover:fill-primary/40"
-                strokeWidth="0.1"
-                vectorEffect="non-scaling-stroke"
-                onClick={(e) => handleStateClick(feature, e)}
-                />
-            ))}
-            <g>
-                <g transform={`translate(${lon}, ${lat}) scale(${pinScale}) translate(-10, -22.5)`}>
-                  <path
-                      d="M10 2.5a7.5 7.5 0 0 1 7.5 7.5c0 4.142-7.5 11.25-7.5 11.25S2.5 14.142 2.5 10A7.5 7.5 0 0 1 10 2.5z"
-                      fill="hsl(var(--primary))"
-                      stroke="hsl(var(--primary-foreground))"
-                      strokeWidth={1 / pinScale}
-                  />
-                  <circle 
-                      cx="10" 
-                      cy="10" 
-                      r="2.5"
-                      fill="hsl(var(--primary-foreground))"
-                  />
+            <g transform="scale(1, -1) translate(0, -38)">
+                {indiaStatesGeoJSON.features.map((feature: any) => (
+                    <path
+                    key={feature.properties.name}
+                    data-name={feature.properties.name}
+                    d={createPath(feature.geometry)}
+                    className="fill-primary/20 stroke-primary/80 transition-all hover:fill-primary/40"
+                    strokeWidth="0.1"
+                    vectorEffect="non-scaling-stroke"
+                    onClick={(e) => handleStateClick(feature, e)}
+                    />
+                ))}
+                <g>
+                    <g transform={`translate(${lon}, ${lat}) scale(${pinScale}) translate(-10, -22.5)`}>
+                      <path
+                          d="M10 2.5a7.5 7.5 0 0 1 7.5 7.5c0 4.142-7.5 11.25-7.5 11.25S2.5 14.142 2.5 10A7.5 7.5 0 0 1 10 2.5z"
+                          fill="hsl(var(--primary))"
+                          stroke="hsl(var(--primary-foreground))"
+                          strokeWidth={1 / pinScale}
+                          transform="scale(1, -1) translate(0, -22.5)"
+                      />
+                      <circle 
+                          cx="10" 
+                          cy="10" 
+                          r="2.5"
+                          fill="hsl(var(--primary-foreground))"
+                          transform="scale(1, -1) translate(0, -20)"
+                      />
+                    </g>
                 </g>
             </g>
       </svg>
