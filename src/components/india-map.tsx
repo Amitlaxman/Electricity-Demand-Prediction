@@ -13,118 +13,96 @@ interface IndiaMapProps {
   lon: number;
 }
 
-// Function to calculate the bounding box of all states
-const getBoundingBox = (features: any[]) => {
-  let minX = Infinity,
-    minY = Infinity,
-    maxX = -Infinity,
-    maxY = -Infinity;
-
-  features.forEach(feature => {
-    const polygons = feature.geometry.coordinates;
-    polygons.forEach((polygon: any) => {
-      polygon.forEach((ring: any) => {
-        ring.forEach((coord: number[]) => {
-          if (coord.length >= 2) {
-            const [x, y] = coord;
-            if (x < minX) minX = x;
-            if (x > maxX) maxX = x;
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
-          }
-        });
-      });
-    });
-  });
-
-  return { minX, minY, maxX, maxY };
-};
-
-
 export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
-  const boundingBox = getBoundingBox(indiaStatesGeoJSON.features);
-  const viewBox = `${boundingBox.minX - 2} ${boundingBox.minY - 12} ${
-    boundingBox.maxX - boundingBox.minX + 5
-  } ${boundingBox.maxY - boundingBox.minY + 15}`;
+  // A robust hardcoded viewBox that fits the map of India
+  const viewBox = "68 6 30 32";
 
-  const handleStateClick = (stateName: string, center: [number, number]) => {
+  const handleStateClick = (stateName: string, center: [number, number], e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent the main map click from firing
     onLocationSelect({ lat: center[1], lng: center[0], state: stateName });
   };
-
+  
   const handleMapClick = (e: React.MouseEvent<SVGSVGElement>) => {
     const svg = e.currentTarget;
     const point = svg.createSVGPoint();
     point.x = e.clientX;
     point.y = e.clientY;
     const transformedPoint = point.matrixTransform(svg.getScreenCTM()?.inverse());
-  
-    let selectedState = 'Unknown';
-    let clickedPath = e.target as SVGPathElement;
-  
-    if (clickedPath.tagName === 'path' && clickedPath.dataset.name) {
-      selectedState = clickedPath.dataset.name;
+    
+    // Determine which state was clicked, or default to "Unknown"
+    let stateName = "Unknown";
+    const targetPath = e.target as SVGPathElement;
+    if (targetPath.dataset.name) {
+      stateName = targetPath.dataset.name;
     }
-  
+    
     onLocationSelect({
       lat: transformedPoint.y,
       lng: transformedPoint.x,
-      state: selectedState,
+      state: stateName,
     });
   };
 
-  const projectToSvg = (lat: number, lon: number) => {
-    return { x: lon, y: lat };
+  const createPath = (geometry: any) => {
+    const { type, coordinates } = geometry;
+    if (type === 'Polygon') {
+      return coordinates
+        .map((ring: any) => `M ${ring.map((p: number[]) => p.join(',')).join(' L ')} Z`)
+        .join(' ');
+    } else if (type === 'MultiPolygon') {
+      return coordinates
+        .map((polygon: any) =>
+          polygon
+            .map((ring: any) => `M ${ring.map((p: number[]) => p.join(',')).join(' L ')} Z`)
+            .join(' ')
+        )
+        .join(' ');
+    }
+    return '';
   };
-  
-  const pinPosition = projectToSvg(lat, lon);
 
-  const createPath = (coordinates: any[]) => {
-    return coordinates.map(polygon => 
-      polygon.map((ring: any) => `M${ring.join('L')}`).join('')
-    ).join('');
-  };
 
   return (
-    <div className="h-full w-full">
-      <svg
-        viewBox={viewBox}
-        className="h-full w-full cursor-pointer"
-        onClick={handleMapClick}
-      >
-        <g>
-          {indiaStatesGeoJSON.features.map(feature => (
-            <path
-              key={feature.properties.name}
-              data-name={feature.properties.name}
-              d={createPath(feature.geometry.coordinates)}
-              className="fill-primary/20 stroke-primary/80 transition-all hover:fill-primary/40"
-              strokeWidth="0.1"
-              onClick={e => {
-                e.stopPropagation();
-                handleStateClick(
-                  feature.properties.name,
-                  feature.properties.center
-                );
-              }}
-            />
-          ))}
-        </g>
-        <g>
-          <path
-            d="M10 2.5a7.5 7.5 0 0 1 7.5 7.5c0 4.142-7.5 11.25-7.5 11.25S2.5 14.142 2.5 10A7.5 7.5 0 0 1 10 2.5z"
-            fill="hsl(var(--primary))"
-            stroke="hsl(var(--primary-foreground))"
-            strokeWidth="0.5"
-            transform={`translate(${pinPosition.x - 1.25}, ${pinPosition.y - 3}) scale(0.25)`}
-          />
-          <circle 
-            cx={pinPosition.x} 
-            cy={pinPosition.y} 
-            r="0.5" 
-            fill="hsl(var(--primary-foreground))"
-            transform={`translate(-0, -0.6)`}
-          />
-        </g>
+    <div className="h-full w-full bg-primary/10">
+        <svg
+            viewBox={viewBox}
+            className="h-full w-full cursor-pointer"
+            onClick={handleMapClick}
+        >
+            <g>
+            {indiaStatesGeoJSON.features.map(feature => (
+                <path
+                key={feature.properties.name}
+                data-name={feature.properties.name}
+                d={createPath(feature.geometry)}
+                className="fill-primary/20 stroke-primary/80 transition-all hover:fill-primary/40"
+                strokeWidth="0.1"
+                onClick={(e) =>
+                    handleStateClick(
+                    feature.properties.name,
+                    feature.properties.center,
+                    e
+                    )
+                }
+                />
+            ))}
+            </g>
+            <g>
+                <path
+                    d="M10 2.5a7.5 7.5 0 0 1 7.5 7.5c0 4.142-7.5 11.25-7.5 11.25S2.5 14.142 2.5 10A7.5 7.5 0 0 1 10 2.5z"
+                    fill="hsl(var(--primary))"
+                    stroke="hsl(var(--primary-foreground))"
+                    strokeWidth="0.5"
+                    transform={`translate(${lon - 1.25}, ${lat - 3}) scale(0.25)`}
+                />
+                <circle 
+                    cx={lon} 
+                    cy={lat} 
+                    r="0.5" 
+                    fill="hsl(var(--primary-foreground))"
+                    transform={`translate(0, -0.6)`}
+                />
+            </g>
       </svg>
     </div>
   );
