@@ -120,29 +120,47 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
       stroke: new Stroke({ color: '#003c88', width: 1 })
     });
   
-    // Reset all features to default style first
-    vectorSource.getFeatures().forEach(f => f.setStyle(defaultStyle));
-  
-    if (selectedState && selectedState !== 'Unknown') {
-      const stateFeature = vectorSource.getFeatures().find(f => f.get('NAME_1') === selectedState);
-      if (stateFeature) {
-        stateFeature.setStyle(highlightStyle);
-        const extent = stateFeature.getGeometry()?.getExtent();
-        if (extent) {
-          mapInstance.current.getView().fit(extent, {
-            padding: [50, 50, 50, 50],
-            duration: 1000,
-            maxZoom: 7,
-          });
+    // This logic runs when the source has finished loading features.
+    const onFeaturesLoadEnd = () => {
+        vectorSource.getFeatures().forEach(f => f.setStyle(defaultStyle));
+    
+        if (selectedState && selectedState !== 'Unknown') {
+            const stateFeature = vectorSource.getFeatures().find(f => f.get('NAME_1') === selectedState);
+            if (stateFeature) {
+                stateFeature.setStyle(highlightStyle);
+                const extent = stateFeature.getGeometry()?.getExtent();
+                if (extent) {
+                    mapInstance.current?.getView().fit(extent, {
+                        padding: [50, 50, 50, 50],
+                        duration: 1000,
+                        maxZoom: 7,
+                    });
+                }
+            }
+        } else {
+            mapInstance.current?.getView().animate({
+                center: initialCenter,
+                zoom: initialZoom,
+                duration: 1000,
+            });
         }
-      }
+    };
+
+    // Handle already loaded features
+    if (vectorSource.getState() === 'ready') {
+        onFeaturesLoadEnd();
     } else {
-      mapInstance.current.getView().animate({
-        center: initialCenter,
-        zoom: initialZoom,
-        duration: 1000,
-      });
+        // Handle features loading for the first time
+        vectorSource.on('featuresloadend', onFeaturesLoadEnd);
     }
+
+    // Cleanup listener on component unmount or when source changes
+    return () => {
+        if(vectorSource.getState() !== 'ready') {
+            vectorSource.un('featuresloadend', onFeaturesLoadEnd);
+        }
+    };
+
   }, [selectedState, initialCenter, initialZoom]);
 
 
