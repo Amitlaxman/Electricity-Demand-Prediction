@@ -9,11 +9,9 @@ import GeoJSON from 'ol/format/GeoJSON';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import { fromLonLat, toLonLat } from 'ol/proj';
-import { Fill, Stroke, Style, Icon } from 'ol/style';
+import { Stroke, Style, Icon } from 'ol/style';
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
-
-import { indiaStatesGeoJSON } from '@/lib/india-states-geojson';
 
 interface IndiaMapProps {
   onLocationSelect: (location: {
@@ -34,19 +32,19 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
 
   const initialCenter = fromLonLat([82.7, 23.5]);
   const initialZoom = 4.5;
-  const viewExtent = fromLonLat([68, 6]).concat(fromLonLat([98, 37]));
+  
+  // A more constrained extent for mainland India
+  const viewExtent = fromLonLat([68, 8]).concat(fromLonLat([98, 37]));
 
 
   useEffect(() => {
     if (mapRef.current && !mapInstance.current) {
-      const geoJsonFormat = new GeoJSON({
-        featureProjection: 'EPSG:3857',
-      });
-
+      
       const vectorSource = new VectorSource({
-        features: geoJsonFormat.readFeatures(indiaStatesGeoJSON),
+        url: 'https://raw.githubusercontent.com/geohacker/india/master/state/india_state.geojson',
+        format: new GeoJSON(),
       });
-
+      
       const defaultStyle = new Style({
         stroke: new Stroke({
           color: '#003c88',
@@ -57,6 +55,7 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
       vectorLayer.current = new VectorLayer({
         source: vectorSource,
         style: defaultStyle,
+        background: 'transparent',
       });
 
       const markerSource = new VectorSource();
@@ -95,14 +94,19 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
         const feature = mapInstance.current?.forEachFeatureAtPixel(
           evt.pixel,
           (feature) => {
-            if (feature.get('name')) { // Ensure it's a state feature
+            // Ensure it's a state feature from our vector layer
+            if (feature.get('NAME_1')) { 
               return feature;
             }
+          },
+          {
+            layerFilter: (layer) => layer === vectorLayer.current,
           }
         );
 
         const coords = toLonLat(evt.coordinate);
-        const stateName = feature?.get('name') || selectedState || 'Unknown';
+        // Use NAME_1 from the new GeoJSON source
+        const stateName = feature?.get('NAME_1') || selectedState || 'Unknown';
         onLocationSelect({ lat: coords[1], lng: coords[0], state: stateName });
       });
     }
@@ -111,10 +115,8 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
   useEffect(() => {
     if (mapInstance.current && selectedState) {
         const vectorSource = vectorLayer.current?.getSource();
+        
         const highlightStyle = new Style({
-            fill: new Fill({
-              color: 'rgba(255, 165, 0, 0.4)',
-            }),
             stroke: new Stroke({
               color: '#ffa500',
               width: 2,
@@ -127,21 +129,41 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
             }),
         });
 
-        vectorSource?.getFeatures().forEach(feature => {
-            if (feature.get('name') === selectedState) {
+        const listener = vectorSource.on('featuresloadend', function(event) {
+          event.features.forEach(feature => {
+              if (feature.get('NAME_1') === selectedState) {
+                  feature.setStyle(highlightStyle);
+                  const extent = feature.getGeometry()?.getExtent();
+                  if (extent) {
+                      mapInstance.current?.getView().fit(extent, {
+                          padding: [50, 50, 50, 50],
+                          duration: 1000,
+                          maxZoom: 7,
+                      });
+                  }
+              } else {
+                  feature.setStyle(defaultStyle);
+              }
+          });
+        });
+        
+        // In case features are already loaded
+        vectorSource.getFeatures().forEach(feature => {
+            if (feature.get('NAME_1') === selectedState) {
                 feature.setStyle(highlightStyle);
                 const extent = feature.getGeometry()?.getExtent();
                 if (extent) {
                     mapInstance.current?.getView().fit(extent, {
                         padding: [50, 50, 50, 50],
                         duration: 1000,
-                        maxZoom: 6,
+                        maxZoom: 7,
                     });
                 }
             } else {
                 feature.setStyle(defaultStyle);
             }
         });
+
     } else if (mapInstance.current) {
         const defaultStyle = new Style({
             stroke: new Stroke({
@@ -149,9 +171,16 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
               width: 1,
             }),
         });
-        vectorLayer.current?.getSource()?.getFeatures().forEach(feature => {
+        const vectorSource = vectorLayer.current?.getSource();
+        const listener = vectorSource.on('featuresloadend', function(event) {
+            event.features.forEach(feature => {
+              feature.setStyle(defaultStyle);
+            });
+        });
+        vectorSource.getFeatures().forEach(feature => {
             feature.setStyle(defaultStyle);
         });
+
         mapInstance.current?.getView().animate({
             center: initialCenter,
             zoom: initialZoom,
