@@ -8,10 +8,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { addDays } from 'date-fns';
+import dynamic from 'next/dynamic';
 
 import { getPrediction, type State } from '@/app/actions';
 import { FilterPanel, type FormValues } from '@/components/filter-panel';
-import { IndiaMap } from '@/components/india-map';
 import { ForecastDisplay } from '@/components/forecast-display';
 import {
   Sidebar,
@@ -24,6 +24,13 @@ import {
 import { IndiaGate } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+
+// Dynamically import the map component to avoid SSR issues with Leaflet
+const IndiaMap = dynamic(() => import('@/components/india-map').then(mod => mod.IndiaMap), {
+  ssr: false,
+  loading: () => <div className="h-full w-full bg-muted animate-pulse" />,
+});
+
 
 const formSchema = z.object({
   state: z.string().min(1, 'Please select a state from the map.'),
@@ -84,13 +91,16 @@ export default function Home() {
     (location: { lat: number; lng: number; state: string }) => {
       form.setValue('lat', location.lat);
       form.setValue('lon', location.lng);
-      form.setValue('state', location.state, { shouldValidate: true });
+      if (location.state) {
+        form.setValue('state', location.state, { shouldValidate: true });
+      }
     },
     [form]
   );
   
   const lat = form.watch('lat');
   const lon = form.watch('lon');
+  const selectedState = form.watch('state');
 
   React.useEffect(() => {
     if (state.errors) {
@@ -137,16 +147,23 @@ export default function Home() {
 
         <main className="relative flex flex-1 flex-col overflow-hidden">
           <div className="absolute inset-0">
-            <IndiaMap onLocationSelect={handleLocationSelect} lat={lat} lon={lon} />
+            <IndiaMap 
+              onLocationSelect={handleLocationSelect} 
+              lat={lat} 
+              lon={lon}
+              selectedState={selectedState}
+            />
           </div>
-          <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-background/80 via-background/50 to-transparent p-4 backdrop-blur-sm">
-              {state.data ? (
-                  <ForecastDisplay result={state.data} />
-              ) : (
-                  <div className="flex min-h-[40vh] items-center justify-center rounded-lg border border-dashed bg-card/50 p-4 text-center text-muted-foreground">
-                      <p>Select a location and date to see the forecast</p>
-                  </div>
-              )}
+          <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-background/80 via-background/50 to-transparent p-4 backdrop-blur-sm pointer-events-none">
+              <div className="pointer-events-auto">
+                {state.data ? (
+                    <ForecastDisplay result={state.data} />
+                ) : (
+                    <div className="flex min-h-[40vh] items-center justify-center rounded-lg border border-dashed bg-card/50 p-4 text-center text-muted-foreground">
+                        <p>Select a location and date to see the forecast</p>
+                    </div>
+                )}
+              </div>
           </div>
         </main>
       </SidebarInset>

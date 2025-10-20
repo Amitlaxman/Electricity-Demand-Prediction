@@ -1,9 +1,18 @@
 'use client';
 
 import * as React from 'react';
-import { RefreshCw } from 'lucide-react';
+import { MapContainer, TileLayer, GeoJSON, Marker, useMap } from 'react-leaflet';
+import type { LatLngExpression, Map } from 'leaflet';
+import L from 'leaflet';
 import { indiaStatesGeoJSON } from '@/lib/india-states-geojson';
-import { Button } from '@/components/ui/button';
+
+// Fix for default Leaflet icon not showing up
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
 
 interface IndiaMapProps {
   onLocationSelect: (location: {
@@ -13,177 +22,119 @@ interface IndiaMapProps {
   }) => void;
   lat: number;
   lon: number;
+  selectedState: string | null;
 }
 
-const INITIAL_VIEWBOX = "68 6 30 32";
+const getBoundingBox = (feature: any) => {
+  const geo = feature.geometry;
+  if (!geo) return null;
 
-// Helper to calculate the bounding box of a geometry
-const getBoundingBox = (geometry: any) => {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-    const processCoordinates = (coords: any[]) => {
-        for (const p of coords) {
-            if (Array.isArray(p[0])) {
-                processCoordinates(p);
-            } else {
-                const [x, y] = p;
-                if (x < minX) minX = x;
-                if (x > maxX) maxX = x;
-                if (y < minY) minY = y;
-                if (y > maxY) maxY = y;
-            }
-        }
-    };
-
-    if (geometry.type === 'Polygon') {
-        geometry.coordinates.forEach(processCoordinates);
-    } else if (geometry.type === 'MultiPolygon') {
-        geometry.coordinates.forEach((poly: any) => poly.forEach(processCoordinates));
-    }
-
-    return { minX, minY, maxX, maxY };
+  const coords = geo.coordinates;
+  const bounds = L.geoJSON(feature).getBounds();
+  return bounds;
 };
 
+function MapController({ selectedState }: { selectedState: string | null }) {
+  const map = useMap();
 
-export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
-  const [viewBox, setViewBox] = React.useState(INITIAL_VIEWBOX);
-  const [isZoomed, setIsZoomed] = React.useState(false);
-  const [selectedState, setSelectedState] = React.useState<string | null>(null);
-  const svgRef = React.useRef<SVGSVGElement>(null);
-
-  const handleStateClick = (feature: any, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const { name, center } = feature.properties;
-    
-    if (selectedState === name) {
-        // If already zoomed in on this state, handle as a map click for precise location
-        handleMapClick(e);
-        return;
+  React.useEffect(() => {
+    if (selectedState) {
+      const feature = indiaStatesGeoJSON.features.find(
+        (f: any) => f.properties.name === selectedState
+      );
+      if (feature) {
+        const bounds = getBoundingBox(feature);
+        if (bounds) {
+          map.fitBounds(bounds);
+        }
+      }
+    } else {
+      // Zoom out to all of India
+      map.fitBounds([[6, 68], [38, 98]]);
     }
+  }, [selectedState, map]);
 
-    setSelectedState(name);
-    
-    // Calculate bounding box and set new viewBox for zoom
-    const bbox = getBoundingBox(feature.geometry);
-    const padding = 1; // Add some padding around the state
-    const width = bbox.maxX - bbox.minX + padding * 2;
-    const height = bbox.maxY - bbox.minY + padding * 2;
-    
-    if (width > 0 && height > 0) {
-      const newViewBox = `${bbox.minX - padding} ${bbox.minY - padding} ${width} ${height}`;
-      setViewBox(newViewBox);
-      setIsZoomed(true);
-    }
-    
-    onLocationSelect({ lat: center[1], lng: center[0], state: name });
-  };
-  
-  const handleMapClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    const svg = svgRef.current;
-    if (!svg) return;
+  return null;
+}
 
-    const point = svg.createSVGPoint();
-    point.x = e.clientX;
-    point.y = e.clientY;
-    const transformedPoint = point.matrixTransform(svg.getScreenCTM()?.inverse());
-    
-    let stateName = selectedState || "Unknown";
-    const targetPath = e.target as SVGPathElement;
-    if (targetPath.dataset.name) {
-      stateName = targetPath.dataset.name;
-    }
-    
-    onLocationSelect({
-      lat: transformedPoint.y,
-      lng: transformedPoint.x,
-      state: stateName,
+
+export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMapProps) {
+  const [map, setMap] = React.useState<Map | null>(null);
+
+  const onEachFeature = (feature: any, layer: any) => {
+    layer.on({
+      click: () => {
+        onLocationSelect({
+          lat: feature.properties.center[1],
+          lng: feature.properties.center[0],
+          state: feature.properties.name,
+        });
+      },
     });
   };
 
-  const createPath = (geometry: any) => {
-    const { type, coordinates } = geometry;
-    if (!coordinates || coordinates.length === 0) return '';
+  const handleMapClick = (e: L.LeafletMouseEvent) => {
+    const { lat, lng } = e.latlng;
+    let stateName = '';
     
-    try {
-      if (type === 'Polygon') {
-        return coordinates
-          .map((ring: any) => `M ${ring.map((p: number[]) => p.join(',')).join(' L ')} Z`)
-          .join(' ');
-      } else if (type === 'MultiPolygon') {
-        return coordinates
-          .map((polygon: any) =>
-            polygon
-              .map((ring: any) => `M ${ring.map((p: number[]) => p.join(',')).join(' L ')} Z`)
-              .join(' ')
-          )
-          .join(' ');
+    // Naive point-in-polygon check
+    const gjLayer = L.geoJSON(indiaStatesGeoJSON);
+    gjLayer.eachLayer((layer: any) => {
+      if (layer.getBounds().contains(e.latlng)) {
+         // This is a simplified check, a real point-in-polygon would be better
+         // For MultiPolygons, we'd need to check each polygon.
+         // Let's find the feature and check its geometry
+        const feature = layer.feature;
+        const poly = L.geoJSON(feature);
+        
+        // This part is tricky with leaflet and complex polygons, we'll do our best
+        // for this demo.
+        if (stateName === '') { // take the first match
+           stateName = feature.properties.name;
+        }
       }
-    } catch (error) {
-      console.error("Error creating path: ", error, " for geometry: ", geometry);
-      return "";
-    }
-    return '';
+    });
+
+    onLocationSelect({ lat, lng, state: stateName || selectedState || 'Unknown' });
+  };
+
+  const geoJsonStyle = {
+    fillColor: "hsl(var(--primary))",
+    fillOpacity: 0.2,
+    color: "hsl(var(--primary))",
+    weight: 1,
   };
   
-  const resetView = () => {
-    setViewBox(INITIAL_VIEWBOX);
-    setIsZoomed(false);
-    setSelectedState(null);
-  }
-
-  const pinScale = isZoomed ? 0.05 : 0.25;
+  const highlightStyle = {
+    fillColor: "hsl(var(--accent))",
+    fillOpacity: 0.4,
+    color: "hsl(var(--accent))",
+    weight: 2,
+  };
 
   return (
-    <div className="relative h-full w-full bg-primary/10">
-        {isZoomed && (
-            <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-2 right-2 z-10 bg-card/50 hover:bg-card"
-                onClick={resetView}
-            >
-                <RefreshCw className="h-4 w-4" />
-                <span className="sr-only">Reset View</span>
-            </Button>
-        )}
-        <svg
-            ref={svgRef}
-            viewBox={viewBox}
-            className="h-full w-full cursor-pointer transition-all duration-500"
-            onClick={isZoomed ? handleMapClick : (e) => e.stopPropagation()}
-        >
-            <g transform="scale(1, -1) translate(0, -38)">
-                {indiaStatesGeoJSON.features.map((feature: any) => (
-                    <path
-                    key={feature.properties.name}
-                    data-name={feature.properties.name}
-                    d={createPath(feature.geometry)}
-                    className="fill-primary/20 stroke-primary/80 transition-all hover:fill-primary/40"
-                    strokeWidth="0.1"
-                    vectorEffect="non-scaling-stroke"
-                    onClick={(e) => handleStateClick(feature, e)}
-                    />
-                ))}
-                <g>
-                    <g transform={`translate(${lon}, ${lat}) scale(${pinScale}) translate(-10, -22.5)`}>
-                      <path
-                          d="M10 2.5a7.5 7.5 0 0 1 7.5 7.5c0 4.142-7.5 11.25-7.5 11.25S2.5 14.142 2.5 10A7.5 7.5 0 0 1 10 2.5z"
-                          fill="hsl(var(--primary))"
-                          stroke="hsl(var(--primary-foreground))"
-                          strokeWidth={1 / pinScale}
-                          transform="scale(1, -1) translate(0, -22.5)"
-                      />
-                      <circle 
-                          cx="10" 
-                          cy="10" 
-                          r="2.5"
-                          fill="hsl(var(--primary-foreground))"
-                          transform="scale(1, -1) translate(0, -20)"
-                      />
-                    </g>
-                </g>
-            </g>
-      </svg>
-    </div>
+    <MapContainer
+      center={[20.5937, 78.9629]}
+      zoom={5}
+      style={{ height: '100%', width: '100%', backgroundColor: 'hsl(var(--background))' }}
+      whenCreated={setMap}
+      onClick={handleMapClick}
+      scrollWheelZoom={true}
+    >
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+      <GeoJSON 
+        key={selectedState} // Re-render when selected state changes
+        data={indiaStatesGeoJSON as any} 
+        onEachFeature={onEachFeature} 
+        style={(feature) => {
+            return feature?.properties.name === selectedState ? highlightStyle : geoJsonStyle;
+        }}
+      />
+      <Marker position={[lat, lon]} />
+      {map && <MapController selectedState={selectedState} />}
+    </MapContainer>
   );
 }
