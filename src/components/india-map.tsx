@@ -90,24 +90,31 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
 
       mapInstance.current.on('click', (evt) => {
         let stateName = 'Unknown';
-        mapInstance.current?.forEachFeatureAtPixel(
+        const feature = mapInstance.current?.forEachFeatureAtPixel(
           evt.pixel,
           (feature) => {
-            if (feature.get('NAME_1')) { 
-              stateName = feature.get('NAME_1');
-              return true; // Stop iterating
-            }
-            return false;
+            return feature;
           },
           {
             layerFilter: (layer) => layer === vectorLayer.current,
           }
         );
 
+        if (feature && feature.get('NAME_1')) {
+          stateName = feature.get('NAME_1');
+        }
+
         const coords = toLonLat(evt.coordinate);
         onLocationSelect({ lat: coords[1], lng: coords[0], state: stateName });
       });
     }
+
+    return () => {
+      if (mapInstance.current) {
+        mapInstance.current.setTarget(undefined);
+        mapInstance.current = null;
+      }
+    };
   }, [onLocationSelect, viewExtent, initialCenter, initialZoom]);
 
   useEffect(() => {
