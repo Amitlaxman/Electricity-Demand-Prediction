@@ -90,19 +90,19 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
 
       mapInstance.current.on('click', (evt) => {
         let stateName = 'Unknown';
-        const feature = mapInstance.current?.forEachFeatureAtPixel(
+        mapInstance.current?.forEachFeatureAtPixel(
           evt.pixel,
           (feature) => {
-            return feature;
+            if (feature && feature.get('st_nm')) {
+              stateName = feature.get('st_nm');
+              return true; // Stop iterating
+            }
+            return false;
           },
           {
             layerFilter: (layer) => layer === vectorLayer.current,
           }
         );
-
-        if (feature && feature.get('NAME_1')) {
-          stateName = feature.get('NAME_1');
-        }
 
         const coords = toLonLat(evt.coordinate);
         onLocationSelect({ lat: coords[1], lng: coords[0], state: stateName });
@@ -134,7 +134,7 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
         vectorSource.getFeatures().forEach(f => f.setStyle(defaultStyle));
     
         if (selectedState && selectedState !== 'Unknown') {
-            const stateFeature = vectorSource.getFeatures().find(f => f.get('NAME_1') === selectedState);
+            const stateFeature = vectorSource.getFeatures().find(f => f.get('st_nm') === selectedState);
             if (stateFeature) {
                 stateFeature.setStyle(highlightStyle);
                 const extent = stateFeature.getGeometry()?.getExtent();
@@ -155,10 +155,17 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
         }
     };
 
-    if (vectorSource.getState() === 'ready') {
-        onFeaturesLoadEnd();
-    } else {
-        vectorSource.once('featuresloadend', onFeaturesLoadEnd);
+    const handleSourceChange = () => {
+        if (vectorSource.getState() === 'ready') {
+            onFeaturesLoadEnd();
+        }
+    };
+
+    vectorSource.on('featuresloadend', handleSourceChange);
+    handleSourceChange(); // Call once in case features are already loaded
+
+    return () => {
+      vectorSource.un('featuresloadend', handleSourceChange);
     }
 
   }, [selectedState, initialCenter, initialZoom]);
