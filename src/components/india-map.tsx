@@ -1,12 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import {
-  Map,
-  AdvancedMarker,
-  Pin,
-  useMap,
-} from '@vis.gl/react-google-maps';
 import { indiaStatesGeoJSON } from '@/lib/india-states-geojson';
 
 interface IndiaMapProps {
@@ -19,97 +13,105 @@ interface IndiaMapProps {
   lon: number;
 }
 
-const Polygon = (props: google.maps.PolygonOptions & { onClick: () => void }) => {
-  const map = useMap();
-  const [polygon, setPolygon] = React.useState<google.maps.Polygon | null>(null);
+// Function to calculate the bounding box of all states
+const getBoundingBox = (features: any[]) => {
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
 
-  React.useEffect(() => {
-    if (map) {
-      const p = new google.maps.Polygon(props);
-      p.setMap(map);
-      google.maps.event.addListener(p, 'click', props.onClick);
-      setPolygon(p);
-      return () => {
-        if (p) {
-            google.maps.event.clearInstanceListeners(p);
-            p.setMap(null);
-        }
-      };
-    }
-  }, [map, props]);
+  features.forEach(feature => {
+    feature.geometry.coordinates[0][0].forEach((coord: number[]) => {
+      const [x, y] = coord;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    });
+  });
 
-  return null;
+  return { minX, minY, maxX, maxY };
 };
 
-
 export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
-  const [map, setMap] = React.useState<google.maps.Map | null>(null);
+  const boundingBox = getBoundingBox(indiaStatesGeoJSON.features);
+  const viewBox = `${boundingBox.minX - 2} ${boundingBox.minY - 12} ${
+    boundingBox.maxX - boundingBox.minX + 5
+  } ${boundingBox.maxY - boundingBox.minY + 15}`;
 
   const handleStateClick = (stateName: string, center: [number, number]) => {
     onLocationSelect({ lat: center[1], lng: center[0], state: stateName });
-    if(map) map.panTo({ lat: center[1], lng: center[0] });
   };
 
-  const handleMapClick = (e: google.maps.MapMouseEvent) => {
-    if (e.latLng) {
-      const clickedLat = e.latLng.lat();
-      const clickedLng = e.latLng.lng();
-      const point = new google.maps.LatLng(clickedLat, clickedLng);
-      let selectedState = 'Unknown';
-
-      for (const feature of indiaStatesGeoJSON.features) {
-        const polygonPaths = feature.geometry.coordinates.map(ring => 
-          ring[0].map(coord => new google.maps.LatLng(coord[1], coord[0]))
-        );
-        const polygon = new google.maps.Polygon({ paths: polygonPaths });
-
-        if (google.maps.geometry.poly.containsLocation(point, polygon)) {
-          selectedState = feature.properties.name;
-          break;
-        }
-      }
-      onLocationSelect({ lat: clickedLat, lng: clickedLng, state: selectedState });
+  const handleMapClick = (e: React.MouseEvent<SVGSVGElement>) => {
+    const svg = e.currentTarget;
+    const point = svg.createSVGPoint();
+    point.x = e.clientX;
+    point.y = e.clientY;
+    const transformedPoint = point.matrixTransform(svg.getScreenCTM()?.inverse());
+  
+    let selectedState = 'Unknown';
+    let clickedPath = e.target as SVGPathElement;
+  
+    if (clickedPath.tagName === 'path' && clickedPath.dataset.name) {
+      selectedState = clickedPath.dataset.name;
     }
+  
+    onLocationSelect({
+      lat: transformedPoint.y,
+      lng: transformedPoint.x,
+      state: selectedState,
+    });
   };
+
+  const projectToSvg = (lat: number, lon: number) => {
+    return { x: lon, y: lat };
+  };
+  
+  const pinPosition = projectToSvg(lat, lon);
 
   return (
     <div className="h-full w-full">
-      <Map
-        ref={setMap}
-        style={{ width: '100%', height: '100%' }}
-        defaultCenter={{ lat: 20.5937, lng: 78.9629 }}
-        defaultZoom={4.5}
-        gestureHandling={'greedy'}
-        disableDefaultUI={true}
-        mapId={'a2f3bdeec493efe'}
+      <svg
+        viewBox={viewBox}
+        className="h-full w-full cursor-pointer"
         onClick={handleMapClick}
       >
-        <AdvancedMarker position={{ lat, lng: lon }}>
-          <Pin
-            background={'hsl(var(--primary))'}
-            borderColor={'hsl(var(--primary-foreground))'}
-            glyphColor={'hsl(var(--primary-foreground))'}
+        <g>
+          {indiaStatesGeoJSON.features.map(feature => (
+            <path
+              key={feature.properties.name}
+              data-name={feature.properties.name}
+              d={`M${feature.geometry.coordinates[0][0].join('L')}`}
+              className="fill-primary/20 stroke-primary/80 transition-all hover:fill-primary/40"
+              strokeWidth="0.1"
+              onClick={e => {
+                e.stopPropagation();
+                handleStateClick(
+                  feature.properties.name,
+                  feature.properties.center
+                );
+              }}
+            />
+          ))}
+        </g>
+        <g>
+          <path
+            d="M10 2.5a7.5 7.5 0 0 1 7.5 7.5c0 4.142-7.5 11.25-7.5 11.25S2.5 14.142 2.5 10A7.5 7.5 0 0 1 10 2.5z"
+            fill="hsl(var(--primary))"
+            stroke="hsl(var(--primary-foreground))"
+            strokeWidth="0.5"
+            transform={`translate(${pinPosition.x - 1.25}, ${pinPosition.y - 3}) scale(0.25)`}
           />
-        </AdvancedMarker>
-
-        {indiaStatesGeoJSON.features.map((feature) => (
-          <Polygon
-            key={feature.properties.name}
-            paths={feature.geometry.coordinates[0][0].map(coord => ({lat: coord[1], lng: coord[0]}))}
-            onClick={() =>
-              handleStateClick(
-                feature.properties.name,
-                feature.properties.center
-              )
-            }
-            strokeColor={'hsl(var(--primary))'}
-            strokeOpacity={0.8}
-            strokeWeight={1}
-            fillColor={'hsl(var(--primary))'}
-            fillOpacity={0.2}
+          <circle 
+            cx={pinPosition.x} 
+            cy={pinPosition.y} 
+            r="0.5" 
+            fill="hsl(var(--primary-foreground))"
+            transform={`translate(-0, -0.6)`}
           />
-        ))}
-      </Map>
+        </g>
+      </svg>
     </div>
   );
 }

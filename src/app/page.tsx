@@ -1,8 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useActionState } from 'react';
-import { useFormStatus } from 'react-dom';
+import { useActionState, useFormStatus } from 'react-dom';
 import { MapPinned } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -23,9 +22,6 @@ import {
 } from '@/components/ui/sidebar';
 import { IndiaGate } from '@/components/icons';
 import { Button } from '@/components/ui/button';
-import {
-  APIProvider,
-} from '@vis.gl/react-google-maps';
 import { useToast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
@@ -109,50 +105,48 @@ export default function Home() {
   }, [state.errors, toast]);
 
   return (
-    <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}>
-      <SidebarProvider>
-        <Sidebar>
-          <PageForm dispatch={dispatch}>
-            <SidebarHeader>
-              <div className="flex items-center gap-2">
-                <IndiaGate className="h-8 w-8 text-primary" />
-                <h1 className="text-xl font-semibold font-headline">
-                  IndiaForecaster
-                </h1>
-              </div>
-            </SidebarHeader>
-            <SidebarContent>
-              <FilterPanel form={form} errors={state?.errors} />
-            </SidebarContent>
-          </PageForm>
-        </Sidebar>
-        <SidebarInset>
-          <header className="flex h-12 items-center justify-between border-b bg-card p-2 md:hidden">
+    <SidebarProvider>
+      <Sidebar>
+        <PageForm dispatch={dispatch}>
+          <SidebarHeader>
             <div className="flex items-center gap-2">
-              <IndiaGate className="h-6 w-6 text-primary" />
-              <h1 className="text-lg font-semibold font-headline">
+              <IndiaGate className="h-8 w-8 text-primary" />
+              <h1 className="text-xl font-semibold font-headline">
                 IndiaForecaster
               </h1>
             </div>
-            <SidebarTrigger size="icon" variant="outline">
-                <MapPinned />
-            </SidebarTrigger>
-          </header>
+          </SidebarHeader>
+          <SidebarContent>
+            <FilterPanel form={form} errors={state?.errors} />
+          </SidebarContent>
+        </PageForm>
+      </Sidebar>
+      <SidebarInset>
+        <header className="flex h-12 items-center justify-between border-b bg-card p-2 md:hidden">
+          <div className="flex items-center gap-2">
+            <IndiaGate className="h-6 w-6 text-primary" />
+            <h1 className="text-lg font-semibold font-headline">
+              IndiaForecaster
+            </h1>
+          </div>
+          <SidebarTrigger size="icon" variant="outline">
+              <MapPinned />
+          </SidebarTrigger>
+        </header>
 
-          <main className="relative flex-1">
-            <IndiaMap onLocationSelect={handleLocationSelect} lat={lat} lon={lon} />
-            <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-background/80 via-background/50 to-transparent p-4 backdrop-blur-sm">
-                {state.data ? (
-                    <ForecastDisplay result={state.data} />
-                ) : (
-                    <div className="flex min-h-[40vh] items-center justify-center rounded-lg border border-dashed bg-card/50 p-4 text-center text-muted-foreground">
-                        <p>Select a location and date to see the forecast</p>
-                    </div>
-                )}
-            </div>
-          </main>
-        </SidebarInset>
-      </SidebarProvider>
-    </APIProvider>
+        <main className="relative flex-1">
+          <IndiaMap onLocationSelect={handleLocationSelect} lat={lat} lon={lon} />
+          <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-background/80 via-background/50 to-transparent p-4 backdrop-blur-sm">
+              {state.data ? (
+                  <ForecastDisplay result={state.data} />
+              ) : (
+                  <div className="flex min-h-[40vh] items-center justify-center rounded-lg border border-dashed bg-card/50 p-4 text-center text-muted-foreground">
+                      <p>Select a location and date to see the forecast</p>
+                  </div>
+              )}
+          </div>
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
