@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { MapPinned } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -68,7 +69,7 @@ function PageForm({
 
 export default function Home() {
   const initialState: State = {};
-  const [state, dispatch] = useFormState(getPrediction, initialState);
+  const [state, dispatch] = useActionState(getPrediction, initialState);
   const { toast } = useToast();
 
   const form = useForm<FormValues>({

@@ -94,7 +94,7 @@ export function FilterPanel({ form, errors }: FilterPanelProps) {
                 <FormControl>
                   <Input type="number" step="0.0001" {...field} />
                 </FormControl>
-                <FormMessage>{errors?.lat}</FormMessage>
+                <FormMessage />
               </FormItem>
             )}
           />
@@ -107,7 +107,7 @@ export function FilterPanel({ form, errors }: FilterPanelProps) {
                 <FormControl>
                   <Input type="number" step="0.0001" {...field} />
                 </FormControl>
-                <FormMessage>{errors?.lon}</FormMessage>
+                <FormMessage />
               </FormItem>
             )}
           />
@@ -148,7 +148,7 @@ export function FilterPanel({ form, errors }: FilterPanelProps) {
                   />
                 </PopoverContent>
               </Popover>
-              <FormMessage>{errors?.predictionDate}</FormMessage>
+              <FormMessage />
             </FormItem>
           )}
         />
@@ -173,7 +173,7 @@ export function FilterPanel({ form, errors }: FilterPanelProps) {
                   <SelectItem value="XGBoost">XGBoost</SelectItem>
                 </SelectContent>
               </Select>
-              <FormMessage>{errors?.model}</FormMessage>
+              <FormMessage />
             </FormItem>
           )}
         />
