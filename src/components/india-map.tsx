@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { MapContainer, TileLayer, GeoJSON, Marker, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, GeoJSON, Marker, useMap, useMapEvents } from 'react-leaflet';
 import type { Map } from 'leaflet';
 import L from 'leaflet';
 import { indiaStatesGeoJSON } from '@/lib/india-states-geojson';
@@ -48,16 +48,15 @@ function MapController({ selectedState, lat, lon }: { selectedState: string | nu
       map.setView([20.5937, 78.9629], 5);
     }
   }, [selectedState, map]);
-
+  
   React.useEffect(() => {
-    // This effect is to move the marker when lat/lon props change,
-    // but without re-fitting the bounds unless the state changes.
-    // We only pan to the new marker if it's outside the current view.
     const markerLatLng = L.latLng(lat, lon);
-    if (!map.getBounds().contains(markerLatLng)) {
+    // Don't pan if the state is selected, as fitBounds is already handling the view.
+    if (!selectedState && !map.getBounds().contains(markerLatLng)) {
         map.panTo(markerLatLng);
     }
-  }, [lat, lon, map]);
+  }, [lat, lon, map, selectedState]);
+
 
   return null;
 }
@@ -68,7 +67,7 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
   const onEachFeature = (feature: any, layer: any) => {
     layer.on({
       click: (e: L.LeafletMouseEvent) => {
-        L.DomEvent.stopPropagation(e); // Prevent map click event from firing
+        L.DomEvent.stopPropagation(e); 
         onLocationSelect({
           lat: e.latlng.lat,
           lng: e.latlng.lng,
@@ -79,33 +78,24 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
   };
 
   const MapClickHandler = () => {
-    const map = useMap();
-    React.useEffect(() => {
-      const handler = (e: L.LeafletMouseEvent) => {
+    useMapEvents({
+      click: (e) => {
         const { lat, lng } = e.latlng;
         let stateName = '';
         
+        // This is a simplified check. A proper point-in-polygon check would be more robust.
         const gjLayer = L.geoJSON(indiaStatesGeoJSON);
         gjLayer.eachLayer((layer: any) => {
-          const feature = layer.feature;
-          // This is a simple check. For better accuracy, a point-in-polygon library would be ideal.
-          if (layer.getBounds().contains(e.latlng)) {
-              const poly = L.geoJSON(feature);
-              // A more precise check, though still not perfect for complex shapes.
-              if (poly.getBounds().contains(e.latlng)) {
-                stateName = feature.properties.name;
-              }
-          }
+            if (layer.getBounds().contains(e.latlng)) {
+                if (stateName === '') { // Prioritize the first match
+                    stateName = layer.feature.properties.name;
+                }
+            }
         });
 
         onLocationSelect({ lat, lng, state: stateName || selectedState || 'Unknown' });
       }
-      map.on('click', handler);
-
-      return () => {
-        map.off('click', handler);
-      }
-    }, [map]);
+    });
 
     return null;
   }
@@ -137,7 +127,7 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <GeoJSON 
-        key={selectedState} // Re-render when selected state changes to apply style
+        key={selectedState} 
         data={indiaStatesGeoJSON as any} 
         onEachFeature={onEachFeature} 
         style={(feature) => {
