@@ -67,6 +67,42 @@ function SubmitButton() {
   );
 }
 
+const states = [
+    { value: 'Andhra Pradesh', label: 'Andhra Pradesh' },
+    { value: 'Arunachal Pradesh', label: 'Arunachal Pradesh' },
+    { value: 'Assam', label: 'Assam' },
+    { value: 'Bihar', label: 'Bihar' },
+    { value: 'Chandigarh', label: 'Chandigarh' },
+    { value: 'Chhattisgarh', label: 'Chhattisgarh' },
+    { value: 'Delhi', label: 'Delhi' },
+    { value: 'Dadra and Nagar Haveli and Daman and Diu', label: 'Dadra & Nagar Haveli (DNH)' },
+    { value: 'Goa', label: 'Goa' },
+    { value: 'Gujarat', label: 'Gujarat' },
+    { value: 'Haryana', label: 'Haryana' },
+    { value: 'Himachal Pradesh', label: 'Himachal Pradesh (HP)' },
+    { value: 'Jammu & Kashmir', label: 'Jammu & Kashmir (J&K)' },
+    { value: 'Jharkhand', label: 'Jharkhand' },
+    { value: 'Karnataka', label: 'Karnataka' },
+    { value: 'Kerala', label: 'Kerala' },
+    { value: 'Maharashtra', label: 'Maharashtra' },
+    { value: 'Manipur', label: 'Manipur' },
+    { value: 'Meghalaya', label: 'Meghalaya' },
+    { value: 'Mizoram', label: 'Mizoram' },
+    { value: 'Madhya Pradesh', label: 'Madhya Pradesh (MP)' },
+    { value: 'Nagaland', label: 'Nagaland' },
+    { value: 'Odisha', label: 'Odisha' },
+    { value: 'Puducherry', label: 'Puducherry (Pondy)' },
+    { value: 'Punjab', label: 'Punjab' },
+    { value: 'Rajasthan', label: 'Rajasthan' },
+    { value: 'Sikkim', label: 'Sikkim' },
+    { value: 'Tamil Nadu', label: 'Tamil Nadu' },
+    { value: 'Telangana', label: 'Telangana' },
+    { value: 'Tripura', label: 'Tripura' },
+    { value: 'Uttar Pradesh', label: 'Uttar Pradesh (UP)' },
+    { value: 'Uttarakhand', label: 'Uttarakhand' },
+    { value: 'West Bengal', label: 'West Bengal' },
+];
+
 export function FilterPanel({ form, errors }: FilterPanelProps) {
   return (
     <Form {...form}>
@@ -77,9 +113,20 @@ export function FilterPanel({ form, errors }: FilterPanelProps) {
           render={({ field }) => (
             <FormItem>
               <FormLabel>State</FormLabel>
-              <FormControl>
-                <Input placeholder="Select a state on the map" {...field} readOnly />
-              </FormControl>
+              <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a state" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {states.map((state) => (
+                    <SelectItem key={state.value} value={state.value}>
+                      {state.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <FormMessage>{errors?.state}</FormMessage>
             </FormItem>
           )}

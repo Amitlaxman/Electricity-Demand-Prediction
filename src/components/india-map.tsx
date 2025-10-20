@@ -9,7 +9,7 @@ import GeoJSON from 'ol/format/GeoJSON';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import { fromLonLat, toLonLat } from 'ol/proj';
-import { Stroke, Style, Icon }from 'ol/style';
+import { Stroke, Style, Icon } from 'ol/style';
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
 
@@ -32,18 +32,15 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
 
   const initialCenter = fromLonLat([82.7, 23.5]);
   const initialZoom = 4.5;
-  
   const viewExtent = fromLonLat([68, 8]).concat(fromLonLat([98, 37]));
-
 
   useEffect(() => {
     if (mapRef.current && !mapInstance.current) {
-      
       const vectorSource = new VectorSource({
         url: 'https://raw.githubusercontent.com/geohacker/india/master/state/india_state.geojson',
         format: new GeoJSON(),
       });
-      
+
       const defaultStyle = new Style({
         stroke: new Stroke({
           color: '#003c88',
@@ -70,7 +67,7 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
           }),
         }),
       });
-      
+
       mapInstance.current = new Map({
         target: mapRef.current,
         layers: [
@@ -87,7 +84,7 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
         }),
         controls: [],
       });
-      
+
       const featuresLoadedListener = vectorSource.on('featuresloadend', () => {
         if (!mapInstance.current) return;
 
@@ -116,11 +113,13 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
       });
     }
 
+    // Cleanup function
     return () => {
-      if (mapInstance.current) {
-        mapInstance.current.setTarget(undefined);
-        mapInstance.current = null;
-      }
+        // The listener should be cleaned up, but map instance should persist
+        // if mapInstance.current) {
+        //     mapInstance.current.setTarget(undefined);
+        //     mapInstance.current = null;
+        // }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -129,54 +128,48 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
     if (!mapInstance.current || !vectorLayer.current) return;
     const vectorSource = vectorLayer.current.getSource();
     if (!vectorSource) return;
-  
+
     const highlightStyle = new Style({
-      stroke: new Stroke({ color: '#ffa500', width: 2 })
+      stroke: new Stroke({ color: '#ffa500', width: 2 }),
     });
     const defaultStyle = new Style({
-      stroke: new Stroke({ color: '#003c88', width: 1 })
+      stroke: new Stroke({ color: '#003c88', width: 1 }),
     });
-  
-    const onFeaturesLoadEnd = () => {
-        vectorSource.getFeatures().forEach(f => f.setStyle(defaultStyle));
-    
-        if (selectedState && selectedState !== 'Unknown') {
-            const stateFeature = vectorSource.getFeatures().find(f => f.get('st_nm') === selectedState);
-            if (stateFeature) {
-                stateFeature.setStyle(highlightStyle);
-                const extent = stateFeature.getGeometry()?.getExtent();
-                if (extent) {
-                    mapInstance.current?.getView().fit(extent, {
-                        padding: [50, 50, 50, 50],
-                        duration: 1000,
-                        maxZoom: 7,
-                    });
-                }
-            }
-        } else {
-            mapInstance.current?.getView().animate({
-                center: initialCenter,
-                zoom: initialZoom,
-                duration: 1000,
+
+    const applyStyles = () => {
+      if (vectorSource.getState() !== 'ready') return;
+      
+      vectorSource.getFeatures().forEach(f => f.setStyle(defaultStyle));
+
+      if (selectedState && selectedState !== 'Unknown') {
+        const stateFeature = vectorSource.getFeatures().find(f => f.get('st_nm') === selectedState);
+        if (stateFeature) {
+          stateFeature.setStyle(highlightStyle);
+          const extent = stateFeature.getGeometry()?.getExtent();
+          if (extent) {
+            mapInstance.current?.getView().fit(extent, {
+              padding: [50, 50, 50, 50],
+              duration: 1000,
+              maxZoom: 7,
             });
+          }
         }
+      } else {
+        mapInstance.current?.getView().animate({
+          center: initialCenter,
+          zoom: initialZoom,
+          duration: 1000,
+        });
+      }
     };
-
-    const handleSourceChange = () => {
-        if (vectorSource.getState() === 'ready') {
-            onFeaturesLoadEnd();
-        }
-    };
-
-    vectorSource.on('featuresloadend', handleSourceChange);
-    handleSourceChange(); // Call once in case features are already loaded
-
-    return () => {
-      vectorSource.un('featuresloadend', handleSourceChange);
+    
+    if (vectorSource.getState() === 'ready') {
+        applyStyles();
+    } else {
+        vectorSource.once('featuresloadend', applyStyles);
     }
-
+    
   }, [selectedState, initialCenter, initialZoom]);
-
 
   useEffect(() => {
     if (markerLayer.current) {
@@ -187,7 +180,6 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
       });
       markerSource.addFeature(marker);
     }
-    
   }, [lat, lon]);
 
   return <div ref={mapRef} style={{ height: '100%', width: '100%' }} />;

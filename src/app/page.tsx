@@ -80,7 +80,7 @@ export default function Home() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      state: '',
+      state: 'Maharashtra',
       lat: 20.5937,
       lon: 78.9629,
       predictionDate: addDays(new Date(), 7),
@@ -92,7 +92,7 @@ export default function Home() {
     (location: { lat: number; lng: number; state: string }) => {
       form.setValue('lat', location.lat);
       form.setValue('lon', location.lng);
-      if (location.state) {
+      if (location.state && location.state !== 'Unknown') {
         form.setValue('state', location.state, { shouldValidate: true });
       }
     },
