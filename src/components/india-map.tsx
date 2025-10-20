@@ -1,7 +1,9 @@
 'use client';
 
 import * as React from 'react';
+import { RefreshCw } from 'lucide-react';
 import { indiaStatesGeoJSON } from '@/lib/india-states-geojson';
+import { Button } from '@/components/ui/button';
 
 interface IndiaMapProps {
   onLocationSelect: (location: {
@@ -13,26 +15,70 @@ interface IndiaMapProps {
   lon: number;
 }
 
-export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
-  // A robust hardcoded viewBox that fits the map of India
-  const viewBox = "68 6 30 32";
+const INITIAL_VIEWBOX = "68 6 30 32";
 
-  const handleStateClick = (stateName: string, center: [number, number], e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent the main map click from firing
-    onLocationSelect({ lat: center[1], lng: center[0], state: stateName });
+// Helper to calculate the bounding box of a geometry
+const getBoundingBox = (geometry: any) => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    const processCoordinates = (coords: any[]) => {
+        for (const p of coords) {
+            if (Array.isArray(p[0])) {
+                processCoordinates(p);
+            } else {
+                const [x, y] = p;
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+        }
+    };
+
+    if (geometry.type === 'Polygon') {
+        geometry.coordinates.forEach(processCoordinates);
+    } else if (geometry.type === 'MultiPolygon') {
+        geometry.coordinates.forEach(poly => poly.forEach(processCoordinates));
+    }
+
+    return { minX, minY, maxX, maxY };
+};
+
+
+export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
+  const [viewBox, setViewBox] = React.useState(INITIAL_VIEWBOX);
+  const [isZoomed, setIsZoomed] = React.useState(false);
+  const svgRef = React.useRef<SVGSVGElement>(null);
+
+  const handleStateClick = (feature: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { name, center } = feature.properties;
+    
+    // Calculate bounding box and set new viewBox for zoom
+    const bbox = getBoundingBox(feature.geometry);
+    const padding = 1; // Add some padding around the state
+    const width = bbox.maxX - bbox.minX + padding * 2;
+    const height = bbox.maxY - bbox.minY + padding * 2;
+    
+    // Ensure width and height are not zero
+    if (width > 0 && height > 0) {
+      const newViewBox = `${bbox.minX - padding} ${bbox.minY - padding} ${width} ${height}`;
+      setViewBox(newViewBox);
+      setIsZoomed(true);
+    }
+    
+    onLocationSelect({ lat: center[1], lng: center[0], state: name });
   };
   
   const handleMapClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    const svg = e.currentTarget;
+    const svg = svgRef.current;
+    if (!svg) return;
+
     const point = svg.createSVGPoint();
     point.x = e.clientX;
     point.y = e.clientY;
     const transformedPoint = point.matrixTransform(svg.getScreenCTM()?.inverse());
     
-    // Adjust for the SVG transform
-    const correctedY = 44 - transformedPoint.y;
-
-    // Determine which state was clicked, or default to "Unknown"
     let stateName = "Unknown";
     const targetPath = e.target as SVGPathElement;
     if (targetPath.dataset.name) {
@@ -40,7 +86,7 @@ export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
     }
     
     onLocationSelect({
-      lat: correctedY,
+      lat: transformedPoint.y,
       lng: transformedPoint.x,
       state: stateName,
     });
@@ -48,31 +94,55 @@ export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
 
   const createPath = (geometry: any) => {
     const { type, coordinates } = geometry;
-    if (type === 'Polygon') {
-      return coordinates
-        .map((ring: any) => `M ${ring.map((p: number[]) => p.join(',')).join(' L ')} Z`)
-        .join(' ');
-    } else if (type === 'MultiPolygon') {
-      return coordinates
-        .map((polygon: any) =>
-          polygon
-            .map((ring: any) => `M ${ring.map((p: number[]) => p.join(',')).join(' L ')} Z`)
-            .join(' ')
-        )
-        .join(' ');
+    if (!coordinates || coordinates.length === 0) return '';
+    
+    try {
+      if (type === 'Polygon') {
+        return coordinates
+          .map((ring: any) => `M ${ring.map((p: number[]) => p.join(',')).join(' L ')} Z`)
+          .join(' ');
+      } else if (type === 'MultiPolygon') {
+        return coordinates
+          .map((polygon: any) =>
+            polygon
+              .map((ring: any) => `M ${ring.map((p: number[]) => p.join(',')).join(' L ')} Z`)
+              .join(' ')
+          )
+          .join(' ');
+      }
+    } catch (error) {
+      console.error("Error creating path: ", error, " for geometry: ", geometry);
+      return "";
     }
     return '';
   };
+  
+  const resetView = () => {
+    setViewBox(INITIAL_VIEWBOX);
+    setIsZoomed(false);
+  }
 
+  const pinScale = isZoomed ? 0.05 : 0.25;
 
   return (
-    <div className="h-full w-full bg-primary/10">
+    <div className="relative h-full w-full bg-primary/10">
+        {isZoomed && (
+            <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 z-10 bg-card/50 hover:bg-card"
+                onClick={resetView}
+            >
+                <RefreshCw className="h-4 w-4" />
+                <span className="sr-only">Reset View</span>
+            </Button>
+        )}
         <svg
+            ref={svgRef}
             viewBox={viewBox}
-            className="h-full w-full cursor-pointer"
+            className="h-full w-full cursor-pointer transition-all duration-500"
             onClick={handleMapClick}
         >
-            <g transform="scale(1, -1) translate(0, -44)">
             {indiaStatesGeoJSON.features.map(feature => (
                 <path
                 key={feature.properties.name}
@@ -80,31 +150,25 @@ export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
                 d={createPath(feature.geometry)}
                 className="fill-primary/20 stroke-primary/80 transition-all hover:fill-primary/40"
                 strokeWidth="0.1"
-                onClick={(e) =>
-                    handleStateClick(
-                    feature.properties.name,
-                    feature.properties.center,
-                    e
-                    )
-                }
+                vectorEffect="non-scaling-stroke"
+                onClick={(e) => handleStateClick(feature, e)}
                 />
             ))}
-            </g>
             <g>
-                <path
-                    d="M10 2.5a7.5 7.5 0 0 1 7.5 7.5c0 4.142-7.5 11.25-7.5 11.25S2.5 14.142 2.5 10A7.5 7.5 0 0 1 10 2.5z"
-                    fill="hsl(var(--primary))"
-                    stroke="hsl(var(--primary-foreground))"
-                    strokeWidth="0.5"
-                    transform={`translate(${lon - 1.25}, ${lat - 3}) scale(0.25)`}
-                />
-                <circle 
-                    cx={lon} 
-                    cy={lat} 
-                    r="0.5" 
-                    fill="hsl(var(--primary-foreground))"
-                    transform={`translate(0, -0.6)`}
-                />
+                <g transform={`translate(${lon}, ${lat}) scale(${pinScale}) translate(-10, -22.5)`}>
+                  <path
+                      d="M10 2.5a7.5 7.5 0 0 1 7.5 7.5c0 4.142-7.5 11.25-7.5 11.25S2.5 14.142 2.5 10A7.5 7.5 0 0 1 10 2.5z"
+                      fill="hsl(var(--primary))"
+                      stroke="hsl(var(--primary-foreground))"
+                      strokeWidth={1 / pinScale}
+                  />
+                  <circle 
+                      cx="10" 
+                      cy="10" 
+                      r="2.5"
+                      fill="hsl(var(--primary-foreground))"
+                  />
+                </g>
             </g>
       </svg>
     </div>
