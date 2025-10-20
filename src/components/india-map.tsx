@@ -30,8 +30,10 @@ const Polygon = (props: google.maps.PolygonOptions & { onClick: () => void }) =>
       google.maps.event.addListener(p, 'click', props.onClick);
       setPolygon(p);
       return () => {
-        google.maps.event.clearInstanceListeners(p);
-        p.setMap(null);
+        if (p) {
+            google.maps.event.clearInstanceListeners(p);
+            p.setMap(null);
+        }
       };
     }
   }, [map, props]);
@@ -56,10 +58,11 @@ export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
       let selectedState = 'Unknown';
 
       for (const feature of indiaStatesGeoJSON.features) {
-        const polygonCoords = feature.geometry.coordinates[0][0].map(
-          (coord: number[]) => new google.maps.LatLng(coord[1], coord[0])
+        const polygonPaths = feature.geometry.coordinates.map(ring => 
+          ring[0].map(coord => new google.maps.LatLng(coord[1], coord[0]))
         );
-        const polygon = new google.maps.Polygon({ paths: polygonCoords });
+        const polygon = new google.maps.Polygon({ paths: polygonPaths });
+
         if (google.maps.geometry.poly.containsLocation(point, polygon)) {
           selectedState = feature.properties.name;
           break;
@@ -92,7 +95,7 @@ export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
         {indiaStatesGeoJSON.features.map((feature) => (
           <Polygon
             key={feature.properties.name}
-            paths={feature.geometry.coordinates[0].map(ring => ring.map(coord => ({lat: coord[1], lng: coord[0]})))}
+            paths={feature.geometry.coordinates[0][0].map(coord => ({lat: coord[1], lng: coord[0]}))}
             onClick={() =>
               handleStateClick(
                 feature.properties.name,
