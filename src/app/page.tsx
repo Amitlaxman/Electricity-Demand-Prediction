@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useActionState, useFormStatus } from 'react-dom';
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { MapPinned } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';

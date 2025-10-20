@@ -21,17 +21,25 @@ const getBoundingBox = (features: any[]) => {
     maxY = -Infinity;
 
   features.forEach(feature => {
-    feature.geometry.coordinates[0][0].forEach((coord: number[]) => {
-      const [x, y] = coord;
-      if (x < minX) minX = x;
-      if (x > maxX) maxX = x;
-      if (y < minY) minY = y;
-      if (y > maxY) maxY = y;
+    const polygons = feature.geometry.coordinates;
+    polygons.forEach((polygon: any) => {
+      polygon.forEach((ring: any) => {
+        ring.forEach((coord: number[]) => {
+          if (coord.length >= 2) {
+            const [x, y] = coord;
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        });
+      });
     });
   });
 
   return { minX, minY, maxX, maxY };
 };
+
 
 export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
   const boundingBox = getBoundingBox(indiaStatesGeoJSON.features);
@@ -70,6 +78,12 @@ export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
   
   const pinPosition = projectToSvg(lat, lon);
 
+  const createPath = (coordinates: any[]) => {
+    return coordinates.map(polygon => 
+      polygon.map((ring: any) => `M${ring.join('L')}`).join('')
+    ).join('');
+  };
+
   return (
     <div className="h-full w-full">
       <svg
@@ -82,7 +96,7 @@ export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
             <path
               key={feature.properties.name}
               data-name={feature.properties.name}
-              d={`M${feature.geometry.coordinates[0][0].join('L')}`}
+              d={createPath(feature.geometry.coordinates)}
               className="fill-primary/20 stroke-primary/80 transition-all hover:fill-primary/40"
               strokeWidth="0.1"
               onClick={e => {
