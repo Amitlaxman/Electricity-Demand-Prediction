@@ -29,6 +29,9 @@ export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
     point.y = e.clientY;
     const transformedPoint = point.matrixTransform(svg.getScreenCTM()?.inverse());
     
+    // Adjust for the SVG transform
+    const correctedY = 44 - transformedPoint.y;
+
     // Determine which state was clicked, or default to "Unknown"
     let stateName = "Unknown";
     const targetPath = e.target as SVGPathElement;
@@ -37,7 +40,7 @@ export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
     }
     
     onLocationSelect({
-      lat: transformedPoint.y,
+      lat: correctedY,
       lng: transformedPoint.x,
       state: stateName,
     });
@@ -69,7 +72,7 @@ export function IndiaMap({ onLocationSelect, lat, lon }: IndiaMapProps) {
             className="h-full w-full cursor-pointer"
             onClick={handleMapClick}
         >
-            <g>
+            <g transform="scale(1, -1) translate(0, -44)">
             {indiaStatesGeoJSON.features.map(feature => (
                 <path
                 key={feature.properties.name}
