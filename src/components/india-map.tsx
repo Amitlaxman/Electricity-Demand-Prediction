@@ -109,89 +109,57 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
         onLocationSelect({ lat: coords[1], lng: coords[0], state: stateName });
       });
     }
-  }, [onLocationSelect, viewExtent]);
+  }, [onLocationSelect, viewExtent, initialCenter, initialZoom]);
 
   useEffect(() => {
-    if (mapInstance.current && selectedState) {
-        const vectorSource = vectorLayer.current?.getSource();
-        
-        const highlightStyle = new Style({
-            stroke: new Stroke({
-              color: '#ffa500',
-              width: 2,
-            }),
-          });
-        const defaultStyle = new Style({
-            stroke: new Stroke({
-              color: '#003c88',
-              width: 1,
-            }),
+    if (!mapInstance.current || !vectorLayer.current) return;
+
+    const vectorSource = vectorLayer.current.getSource();
+    if (!vectorSource) return;
+
+    const highlightStyle = new Style({
+      stroke: new Stroke({
+        color: '#ffa500',
+        width: 2,
+      }),
+    });
+    const defaultStyle = new Style({
+      stroke: new Stroke({
+        color: '#003c88',
+        width: 1,
+      }),
+    });
+
+    const features = vectorSource.getFeatures();
+    let stateFeature: Feature | undefined;
+
+    features.forEach(feature => {
+      if (feature.get('NAME_1') === selectedState) {
+        feature.setStyle(highlightStyle);
+        stateFeature = feature;
+      } else {
+        feature.setStyle(defaultStyle);
+      }
+    });
+
+    if (stateFeature) {
+      const extent = stateFeature.getGeometry()?.getExtent();
+      if (extent) {
+        mapInstance.current?.getView().fit(extent, {
+          padding: [50, 50, 50, 50],
+          duration: 1000,
+          maxZoom: 7,
         });
-
-        const applyStyles = (features: Feature[]) => {
-            let stateFound = false;
-            features.forEach(feature => {
-                if (feature.get('NAME_1') === selectedState) {
-                    feature.setStyle(highlightStyle);
-                    const extent = feature.getGeometry()?.getExtent();
-                    if (extent) {
-                        mapInstance.current?.getView().fit(extent, {
-                            padding: [50, 50, 50, 50],
-                            duration: 1000,
-                            maxZoom: 7,
-                        });
-                    }
-                    stateFound = true;
-                } else {
-                    feature.setStyle(defaultStyle);
-                }
-            });
-
-            if (!stateFound && selectedState === 'Unknown') {
-                 mapInstance.current?.getView().animate({
-                    center: initialCenter,
-                    zoom: initialZoom,
-                    duration: 1000
-                });
-            }
-        };
-
-        if (vectorSource) {
-            const features = vectorSource.getFeatures();
-            if (features.length > 0) {
-                applyStyles(features);
-            } else {
-                vectorSource.on('featuresloadend', function(event) {
-                    applyStyles(event.features);
-                });
-            }
-        }
-    } else if (mapInstance.current) {
-        const defaultStyle = new Style({
-            stroke: new Stroke({
-              color: '#003c88',
-              width: 1,
-            }),
-        });
-        const vectorSource = vectorLayer.current?.getSource();
-        if (vectorSource) {
-            const listener = vectorSource.on('featuresloadend', function(event) {
-                event.features.forEach(feature => {
-                  feature.setStyle(defaultStyle);
-                });
-            });
-            vectorSource.getFeatures().forEach(feature => {
-                feature.setStyle(defaultStyle);
-            });
-        }
-
-        mapInstance.current?.getView().animate({
-            center: initialCenter,
-            zoom: initialZoom,
-            duration: 1000
-        });
+      }
+    } else if (!selectedState || selectedState === 'Unknown') {
+      mapInstance.current?.getView().animate({
+        center: initialCenter,
+        zoom: initialZoom,
+        duration: 1000,
+      });
     }
   }, [selectedState, initialCenter, initialZoom]);
+
 
   useEffect(() => {
     if (markerLayer.current) {
