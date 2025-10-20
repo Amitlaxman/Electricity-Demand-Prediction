@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { MapContainer, TileLayer, GeoJSON, Marker, useMap } from 'react-leaflet';
-import type { LatLngExpression, Map } from 'leaflet';
+import type { Map } from 'leaflet';
 import L from 'leaflet';
 import { indiaStatesGeoJSON } from '@/lib/india-states-geojson';
 
@@ -26,15 +26,11 @@ interface IndiaMapProps {
 }
 
 const getBoundingBox = (feature: any) => {
-  const geo = feature.geometry;
-  if (!geo) return null;
-
-  const coords = geo.coordinates;
-  const bounds = L.geoJSON(feature).getBounds();
-  return bounds;
+  if (!feature) return null;
+  return L.geoJSON(feature).getBounds();
 };
 
-function MapController({ selectedState }: { selectedState: string | null }) {
+function MapController({ selectedState, lat, lon }: { selectedState: string | null, lat: number, lon: number }) {
   const map = useMap();
 
   React.useEffect(() => {
@@ -49,54 +45,69 @@ function MapController({ selectedState }: { selectedState: string | null }) {
         }
       }
     } else {
-      // Zoom out to all of India
-      map.fitBounds([[6, 68], [38, 98]]);
+      map.setView([20.5937, 78.9629], 5);
     }
   }, [selectedState, map]);
+
+  React.useEffect(() => {
+    // This effect is to move the marker when lat/lon props change,
+    // but without re-fitting the bounds unless the state changes.
+    // We only pan to the new marker if it's outside the current view.
+    const markerLatLng = L.latLng(lat, lon);
+    if (!map.getBounds().contains(markerLatLng)) {
+        map.panTo(markerLatLng);
+    }
+  }, [lat, lon, map]);
 
   return null;
 }
 
 
 export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMapProps) {
-  const [map, setMap] = React.useState<Map | null>(null);
 
   const onEachFeature = (feature: any, layer: any) => {
     layer.on({
-      click: () => {
+      click: (e: L.LeafletMouseEvent) => {
+        L.DomEvent.stopPropagation(e); // Prevent map click event from firing
         onLocationSelect({
-          lat: feature.properties.center[1],
-          lng: feature.properties.center[0],
+          lat: e.latlng.lat,
+          lng: e.latlng.lng,
           state: feature.properties.name,
         });
       },
     });
   };
 
-  const handleMapClick = (e: L.LeafletMouseEvent) => {
-    const { lat, lng } = e.latlng;
-    let stateName = '';
-    
-    // Naive point-in-polygon check
-    const gjLayer = L.geoJSON(indiaStatesGeoJSON);
-    gjLayer.eachLayer((layer: any) => {
-      if (layer.getBounds().contains(e.latlng)) {
-         // This is a simplified check, a real point-in-polygon would be better
-         // For MultiPolygons, we'd need to check each polygon.
-         // Let's find the feature and check its geometry
-        const feature = layer.feature;
-        const poly = L.geoJSON(feature);
+  const MapClickHandler = () => {
+    const map = useMap();
+    React.useEffect(() => {
+      const handler = (e: L.LeafletMouseEvent) => {
+        const { lat, lng } = e.latlng;
+        let stateName = '';
         
-        // This part is tricky with leaflet and complex polygons, we'll do our best
-        // for this demo.
-        if (stateName === '') { // take the first match
-           stateName = feature.properties.name;
-        }
-      }
-    });
+        const gjLayer = L.geoJSON(indiaStatesGeoJSON);
+        gjLayer.eachLayer((layer: any) => {
+          const feature = layer.feature;
+          const poly = L.geoJSON(feature);
+          // A proper point-in-polygon check would be better here.
+          // For this demo, we can use a library if needed, or rely on the onEachFeature click.
+          // For now, we find the containing bounds.
+          if (poly.getBounds().contains(e.latlng)) {
+            stateName = feature.properties.name;
+          }
+        });
 
-    onLocationSelect({ lat, lng, state: stateName || selectedState || 'Unknown' });
-  };
+        onLocationSelect({ lat, lng, state: stateName || selectedState || 'Unknown' });
+      }
+      map.on('click', handler);
+
+      return () => {
+        map.off('click', handler);
+      }
+    }, [map]);
+
+    return null;
+  }
 
   const geoJsonStyle = {
     fillColor: "hsl(var(--primary))",
@@ -117,16 +128,15 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
       center={[20.5937, 78.9629]}
       zoom={5}
       style={{ height: '100%', width: '100%', backgroundColor: 'hsl(var(--background))' }}
-      whenCreated={setMap}
-      onClick={handleMapClick}
       scrollWheelZoom={true}
+      key="india-map-container"
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <GeoJSON 
-        key={selectedState} // Re-render when selected state changes
+        key={selectedState} // Re-render when selected state changes to apply style
         data={indiaStatesGeoJSON as any} 
         onEachFeature={onEachFeature} 
         style={(feature) => {
@@ -134,7 +144,8 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
         }}
       />
       <Marker position={[lat, lon]} />
-      {map && <MapController selectedState={selectedState} />}
+      <MapController selectedState={selectedState} lat={lat} lon={lon} />
+      <MapClickHandler />
     </MapContainer>
   );
 }
