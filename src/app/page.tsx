@@ -24,8 +24,9 @@ import {
 import { IndiaGate } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { DraggableResizablePanel } from '@/components/draggable-resizable-panel';
 
-// Dynamically import the map component to avoid SSR issues with Leaflet
+// Dynamically import the map component to avoid SSR issues
 const IndiaMap = dynamic(() => import('@/components/india-map').then(mod => mod.IndiaMap), {
   ssr: false,
   loading: () => <div className="h-full w-full bg-muted animate-pulse" />,
@@ -154,17 +155,19 @@ export default function Home() {
               selectedState={selectedState}
             />
           </div>
-          <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-background/80 via-background/50 to-transparent p-4 backdrop-blur-sm pointer-events-none">
-              <div className="pointer-events-auto">
-                {state.data ? (
-                    <ForecastDisplay result={state.data} />
-                ) : (
-                    <div className="flex min-h-[40vh] items-center justify-center rounded-lg border border-dashed bg-card/50 p-4 text-center text-muted-foreground">
-                        <p>Select a location and date to see the forecast</p>
-                    </div>
-                )}
-              </div>
-          </div>
+          <DraggableResizablePanel
+            initialPosition={{ x: 30, y: 30 }}
+            initialSize={{ width: '80vw', height: 'auto' }}
+            title="Forecast"
+          >
+            {state.data ? (
+                <ForecastDisplay result={state.data} />
+            ) : (
+                <div className="flex min-h-[20vh] items-center justify-center rounded-lg p-4 text-center text-muted-foreground">
+                    <p>Select a location and date to see the forecast</p>
+                </div>
+            )}
+          </DraggableResizablePanel>
         </main>
       </SidebarInset>
     </SidebarProvider>
