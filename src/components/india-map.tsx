@@ -115,7 +115,8 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
         mapInstance.current = null;
       }
     };
-  }, [onLocationSelect, viewExtent, initialCenter, initialZoom]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!mapInstance.current || !vectorLayer.current) return;
