@@ -85,7 +85,6 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
           center: initialCenter,
           zoom: initialZoom,
           extent: viewExtent,
-          constrainOnlyCenter: true,
         }),
         controls: [],
       });
