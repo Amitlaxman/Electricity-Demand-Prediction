@@ -46,9 +46,11 @@ const formSchema = z.object({
 function PageForm({
   children,
   dispatch,
+  form,
 }: {
   children: React.ReactNode;
   dispatch: (payload: FormData) => void;
+  form: any;
 }) {
   const formRef = React.useRef<HTMLFormElement>(null);
   const { pending } = useFormStatus();
@@ -62,8 +64,19 @@ function PageForm({
   return (
     <form
       ref={formRef}
-      action={(formData: FormData) => {
-        dispatch(formData);
+      action={async (formData: FormData) => {
+        // Get the current form values from React Hook Form
+        const currentValues = form.getValues();
+        
+        // Create a new FormData with the current values
+        const newFormData = new FormData();
+        newFormData.append('state', currentValues.state);
+        newFormData.append('lat', currentValues.lat.toString());
+        newFormData.append('lon', currentValues.lon.toString());
+        newFormData.append('predictionDate', currentValues.predictionDate.toISOString());
+        newFormData.append('model', currentValues.model);
+        
+        dispatch(newFormData);
       }}
     >
       {children}
@@ -119,7 +132,7 @@ export default function Home() {
   return (
     <SidebarProvider>
       <Sidebar>
-        <PageForm dispatch={dispatch}>
+        <PageForm dispatch={dispatch} form={form}>
           <SidebarHeader>
             <div className="flex items-center gap-2">
               <IndiaGate className="h-8 w-8 text-primary" />
