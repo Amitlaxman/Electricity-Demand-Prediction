@@ -144,8 +144,7 @@ class AdvancedModelPredictor:
             noise = np.random.normal(0, 5)
             
             usage = base_usage + trend + seasonality + noise
-            # Add 300 to match the scale of historical data
-            usage = max(0, round(usage + 300, 2))
+            usage = max(0, round(usage, 2))
             
             historical_data.append({
                 'date': date.strftime('%Y-%m-%d'),
@@ -173,8 +172,7 @@ class AdvancedModelPredictor:
             noise = np.random.normal(0, 3)  # Less noise in forecast
             
             usage = base_usage + trend + seasonality + noise
-            # Add 300 to match the scale of historical data
-            usage = max(0, round(usage + 300, 2))
+            usage = max(0, round(usage, 2))
             
             forecast_data.append({
                 'date': date.strftime('%Y-%m-%d'),
@@ -206,8 +204,7 @@ class AdvancedModelPredictor:
                 noise = np.random.normal(0, 5)
                 
                 predicted_usage = base_usage + trend + seasonality + noise
-                # Add 300 to match the scale of historical data
-                predicted_usage = max(0, round(predicted_usage + 300, 2))
+                predicted_usage = max(0, round(predicted_usage, 2))
                 
             elif model_type == 'XGBoost':
                 # For XGBoost models, try to use the actual model
@@ -236,8 +233,7 @@ class AdvancedModelPredictor:
                 noise = np.random.normal(0, 3)
                 
                 predicted_usage = base_usage + trend + seasonality + noise
-                # Add 300 to match the scale of historical data
-                predicted_usage = max(0, round(predicted_usage + 300, 2))
+                predicted_usage = max(0, round(predicted_usage, 2))
                 
             elif model_type == 'Prophet':
                 # For Prophet models, use a sophisticated approach
@@ -251,8 +247,7 @@ class AdvancedModelPredictor:
                 noise = np.random.normal(0, 4)
                 
                 predicted_usage = base_usage + trend + seasonality + noise
-                # Add 300 to match the scale of historical data
-                predicted_usage = max(0, round(predicted_usage + 300, 2))
+                predicted_usage = max(0, round(predicted_usage, 2))
             
             else:
                 raise ValueError(f"Unsupported model type: {model_type}")

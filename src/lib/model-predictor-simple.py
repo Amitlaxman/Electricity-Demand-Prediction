@@ -60,23 +60,22 @@ def generate_prediction(state: str, lat: float, lon: float, prediction_date: str
                       lat_adjustment + lon_adjustment + model_adjustment + 
                       (np.random.random() - 0.5) * 10)
     
-    # Add 300 to match the scale of historical data and ensure non-negative
-    predicted_usage = max(0, round(predicted_usage + 300, 2))
+    # Ensure non-negative and round to 2 decimals
+    predicted_usage = max(0, round(predicted_usage, 2))
     
     # Generate historical data
     historical_data = []
     for i in range(90, 0, -1):
         date = today - timedelta(days=i)
         day_of_year_hist = date.timetuple().tm_yday
-        
+
         seasonality_hist = 20 * np.sin(2 * np.pi * day_of_year_hist / 365.25)
         trend = (90 - i) * 0.1
         noise = (np.random.random() - 0.5) * 10
-        
+
         usage = base_usage + trend + seasonality_hist + noise
-        # Add 300 to match the scale of historical data
-        usage = max(0, round(usage + 300, 2))
-        
+        usage = max(0, round(usage, 2))
+
         historical_data.append({
             'date': date.strftime('%Y-%m-%d'),
             'usage': usage
@@ -87,15 +86,14 @@ def generate_prediction(state: str, lat: float, lon: float, prediction_date: str
     for i in range(1, max(1, days_ahead) + 1):
         date = pred_date + timedelta(days=i)
         day_of_year_forecast = date.timetuple().tm_yday
-        
+
         seasonality_forecast = 20 * np.sin(2 * np.pi * day_of_year_forecast / 365.25)
         trend_forecast = i * 0.1
         noise_forecast = (np.random.random() - 0.5) * 5
-        
+
         usage = base_usage + trend_forecast + seasonality_forecast + noise_forecast
-        # Add 300 to match the scale of historical data
-        usage = max(0, round(usage + 300, 2))
-        
+        usage = max(0, round(usage, 2))
+
         forecast_data.append({
             'date': date.strftime('%Y-%m-%d'),
             'usage': usage

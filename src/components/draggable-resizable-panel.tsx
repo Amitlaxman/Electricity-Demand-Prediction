@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { motion, PanInfo } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Maximize, Minimize, Minimize2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useDraggable } from '@/hooks/use-draggable';
@@ -39,9 +39,9 @@ export function DraggableResizablePanel({
     const onPointerMove = (moveEvent: PointerEvent) => {
       const dx = moveEvent.clientX - startPosition.x;
       const dy = moveEvent.clientY - startPosition.y;
-      
-      let newWidth = size.width;
-      let newHeight = size.height;
+
+      let newWidth: number = Number(size.width);
+      let newHeight: number = Number(size.height);
 
       if (direction.includes('right')) {
         newWidth = startSize.width + dx;
@@ -49,7 +49,7 @@ export function DraggableResizablePanel({
       if (direction.includes('bottom')) {
         newHeight = startSize.height + dy;
       }
-      
+
       setSize({ width: Math.max(newWidth, 200), height: Math.max(newHeight, 150) });
     };
 
@@ -72,7 +72,6 @@ export function DraggableResizablePanel({
       <motion.div
         drag
         dragListener={false} // We use our own drag handler on the header
-        onDrag={handleDrag}
         dragMomentum={false}
         style={{ x: position.x, y: position.y }}
         className={cn(
@@ -84,12 +83,13 @@ export function DraggableResizablePanel({
       >
         <header
           onPointerDown={(e) => {
-            // Only allow dragging from the header itself, not buttons
-            if (e.target === e.currentTarget) {
-                (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-                handleDrag(e, {} as PanInfo);
-            }
-          }}
+              // Only allow dragging from the header itself, not buttons
+              if (e.target === e.currentTarget) {
+                  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                  // Pass only the event; useDraggable will normalize the event
+                  handleDrag(e);
+              }
+            }}
           className="flex items-center justify-between px-3 py-2 border-b rounded-t-lg cursor-grab active:cursor-grabbing bg-muted/50"
         >
           <span className="font-semibold text-sm">{title}</span>

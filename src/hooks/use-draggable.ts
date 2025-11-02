@@ -7,19 +7,24 @@ export function useDraggable(initialPosition: {x: number, y: number}, constraint
   const x = useMotionValue(initialPosition.x);
   const y = useMotionValue(initialPosition.y);
 
-  const handleDrag = (event: React.PointerEvent) => {
-    if (!constraintsRef.current) return;
-    
+  // Accept either (event) or (event, info) to be compatible with framer-motion handlers
+  const handleDrag = (event: any, _info?: any) => {
+    // Normalize to PointerEvent if possible
+    const pointerEvent: PointerEvent | null = event && event.nativeEvent && event.nativeEvent instanceof PointerEvent
+      ? event.nativeEvent
+      : (event as PointerEvent);
+
+    if (!constraintsRef.current || !pointerEvent) return;
+
     const startX = x.get();
     const startY = y.get();
     const panelElement = event.currentTarget as HTMLElement;
-    const panelWidth = panelElement.offsetWidth;
-    const panelHeight = panelElement.offsetHeight;
-
+    const panelWidth = panelElement ? panelElement.offsetWidth : 0;
+    const panelHeight = panelElement ? panelElement.offsetHeight : 0;
 
     const onPointerMove = (moveEvent: PointerEvent) => {
-        const deltaX = moveEvent.clientX - event.clientX;
-        const deltaY = moveEvent.clientY - event.clientY;
+        const deltaX = moveEvent.clientX - pointerEvent.clientX;
+        const deltaY = moveEvent.clientY - pointerEvent.clientY;
 
         const { width, height } = constraintsRef.current!.getBoundingClientRect();
         

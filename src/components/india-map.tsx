@@ -174,6 +174,7 @@ export function IndiaMap({ onLocationSelect, lat, lon, selectedState }: IndiaMap
   useEffect(() => {
     if (markerLayer.current) {
       const markerSource = markerLayer.current.getSource();
+      if (!markerSource) return;
       markerSource.clear();
       const marker = new Feature({
         geometry: new Point(fromLonLat([lon, lat])),

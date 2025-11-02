@@ -206,8 +206,8 @@ export class ModelService {
                           weeklyPattern + latAdjustment + lonAdjustment + modelAdjustment + 
                           (Math.random() - 0.5) * 0.05 * averageUsage; // Small random variation
     
-    // Add 300 to match the scale of historical data
-    const finalPrediction = Math.max(0, Math.round((predictedUsage + 300) * 100) / 100);
+  // Final prediction (ensure non-negative and round to 2 decimals)
+  const finalPrediction = Math.max(0, Math.round(predictedUsage * 100) / 100);
     
     // Generate forecast data based on the trend
     const forecastData = [];
@@ -219,9 +219,8 @@ export class ModelService {
       const forecastTrend = trend * i;
       const forecastNoise = (Math.random() - 0.5) * 0.03 * averageUsage;
       
-      const forecastUsage = averageUsage + forecastTrend + forecastSeasonality + forecastNoise;
-      // Add 300 to match the scale of historical data
-      const finalForecastUsage = Math.max(0, Math.round((forecastUsage + 300) * 100) / 100);
+  const forecastUsage = averageUsage + forecastTrend + forecastSeasonality + forecastNoise;
+  const finalForecastUsage = Math.max(0, Math.round(forecastUsage * 100) / 100);
       
       forecastData.push({
         date: date.toISOString().split('T')[0],
@@ -299,8 +298,8 @@ export class ModelService {
                           latAdjustment + lonAdjustment + modelAdjustment + 
                           (Math.random() - 0.5) * 10; // Add some noise
     
-    // Add 300 to match the scale of historical data and ensure non-negative
-    const finalPrediction = Math.max(0, Math.round((predictedUsage + 300) * 100) / 100);
+  // Final prediction (ensure non-negative and round to 2 decimals)
+  const finalPrediction = Math.max(0, Math.round(predictedUsage * 100) / 100);
     
     // Generate historical data
     const historicalData = this.generateHistoricalData(state, 90);
@@ -334,9 +333,8 @@ export class ModelService {
       const trend = (days - i) * 0.1;
       const noise = (Math.random() - 0.5) * 10;
       
-      const usage = baseUsage + trend + seasonality + noise;
-      // Add 300 to match the scale of historical data
-      const finalUsage = Math.max(0, Math.round((usage + 300) * 100) / 100);
+  const usage = baseUsage + trend + seasonality + noise;
+  const finalUsage = Math.max(0, Math.round(usage * 100) / 100);
       
       historicalData.push({
         date: date.toISOString().split('T')[0],
@@ -364,9 +362,8 @@ export class ModelService {
       const trend = i * 0.1;
       const noise = (Math.random() - 0.5) * 5; // Less noise in forecast
       
-      const usage = baseUsage + trend + seasonality + noise;
-      // Add 300 to match the scale of historical data
-      const finalUsage = Math.max(0, Math.round((usage + 300) * 100) / 100);
+  const usage = baseUsage + trend + seasonality + noise;
+  const finalUsage = Math.max(0, Math.round(usage * 100) / 100);
       
       forecastData.push({
         date: date.toISOString().split('T')[0],

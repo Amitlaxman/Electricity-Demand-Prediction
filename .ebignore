@@ -1,0 +1,8 @@
+# ignore local dev artefacts
+node_modules/
+.vscode/
+.git/
+models/
+*.log
+*.tar.gz
+*.zip

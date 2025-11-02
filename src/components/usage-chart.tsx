@@ -60,6 +60,24 @@ export function UsageChart({ data }: UsageChartProps) {
     });
   }, [sortedData]);
 
+  // Prepare a small dataset to draw the connecting line between historical and forecast:
+  // it contains a single numeric field "transitionValue" set only at the two points to connect.
+  const transitionLineData = React.useMemo(() => {
+    if (transitionIndex <= 0) return null;
+    return sortedData.map((item, idx) => {
+      if (idx === transitionIndex - 1) return { ...item, transitionValue: item.usage ?? null };
+      if (idx === transitionIndex) return { ...item, transitionValue: item.forecastUsage ?? null };
+      return { ...item, transitionValue: null };
+    });
+  }, [sortedData, transitionIndex]);
+
+  // Compute Y domain with a 8% buffer to prevent lines from touching the top/bottom
+  const yValues = sortedData.flatMap(d => [d.usage ?? null, d.forecastUsage ?? null]).filter(Boolean) as number[];
+  const yMin = yValues.length ? Math.min(...yValues) : 0;
+  const yMax = yValues.length ? Math.max(...yValues) : 100;
+  const buffer = Math.max(5, (yMax - yMin) * 0.08);
+
+
   return (
     <ChartContainer config={chartConfig} className="h-80 w-full">
       <ResponsiveContainer>
@@ -131,13 +149,10 @@ export function UsageChart({ data }: UsageChartProps) {
           />
           
           {/* Transition line to connect historical and forecast */}
-          {transitionIndex > 0 && (
+          {transitionLineData && (
             <Line
-              dataKey={(entry, index) => {
-                if (index === transitionIndex - 1) return entry.usage;
-                if (index === transitionIndex) return entry.forecastUsage;
-                return null;
-              }}
+              data={transitionLineData}
+              dataKey="transitionValue"
               stroke="hsl(var(--chart-1))"
               strokeWidth={2}
               dot={false}
