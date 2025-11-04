@@ -57,20 +57,22 @@ jobs:
       - name: Upload to S3
         run: |
           KEY="${EB_APP_NAME}/deploy-${{ steps.vars.outputs.TAG }}.zip"
-          aws s3 cp app.zip s3://${{ steps.s3info.outputs.BUCKET }}/$KEY
+          echo "Uploading to s3://${{ steps.s3info.outputs.BUCKET }}/$KEY"
+          aws s3 cp app.zip "s3://${{ steps.s3info.outputs.BUCKET }}/$KEY"
           echo "S3_KEY=$KEY" >> $GITHUB_ENV
 
       - name: Create EB version
         run: |
           VER="build-${{ steps.vars.outputs.TAG }}"
           aws elasticbeanstalk create-application-version \
-            --application-name $EB_APP_NAME \
-            --version-label $VER \
-            --source-bundle S3Bucket=${{ steps.s3info.outputs.BUCKET }},S3Key=$S3_KEY
+            --application-name "${EB_APP_NAME}" \
+            --version-label "$VER" \
+            --source-bundle S3Bucket="${{ steps.s3info.outputs.BUCKET }}",S3Key="$S3_KEY"
           echo "VER=$VER" >> $GITHUB_ENV
 
       - name: Deploy to EB
         run: |
           aws elasticbeanstalk update-environment \
-            --environment-name $EB_ENV_NAME \
-            --version-label $VER
+            --environment-name "${EB_ENV_NAME}" \
+            --version-label "$VER"
+
