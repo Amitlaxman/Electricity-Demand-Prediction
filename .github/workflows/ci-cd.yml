@@ -1,0 +1,76 @@
+name: CI/CD to Elastic Beanstalk
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  EB_APP_NAME: ${{ secrets.EB_APP_NAME }}
+  EB_ENV_NAME: ${{ secrets.EB_ENV_NAME }}
+  DOCKER_IMAGE_NAME: ${{ secrets.DOCKER_IMAGE_NAME }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set dynamic Docker tags
+        id: vars
+        run: |
+          SHA="${GITHUB_SHA::7}"
+          echo "TAG=$SHA" >> $GITHUB_OUTPUT
+          echo "IMAGE=${DOCKER_IMAGE_NAME}:$SHA" >> $GITHUB_OUTPUT
+
+      - name: Login to Docker Hub
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Build Docker image
+        run: docker build -t ${{ steps.vars.outputs.IMAGE }} -t ${{ secrets.DOCKER_IMAGE_NAME }}:latest .
+
+      - name: Push Docker image to Docker Hub
+        run: |
+          docker push ${{ steps.vars.outputs.IMAGE }}
+          docker push ${{ secrets.DOCKER_IMAGE_NAME }}:latest
+
+      - name: Prepare Dockerrun file
+        run: |
+          sed "s|__TAG__|${{ steps.vars.outputs.TAG }}|g" Dockerrun.aws.json.tpl > Dockerrun.aws.json
+          zip app.zip Dockerrun.aws.json
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Get EB S3 bucket
+        id: s3info
+        run: |
+          ACC=$(aws sts get-caller-identity --query Account --output text)
+          echo "BUCKET=elasticbeanstalk-${AWS_REGION}-${ACC}" >> $GITHUB_OUTPUT
+
+      - name: Upload to S3
+        run: |
+          KEY="${EB_APP_NAME}/deploy-${{ steps.vars.outputs.TAG }}.zip"
+          aws s3 cp app.zip s3://${{ steps.s3info.outputs.BUCKET }}/$KEY
+          echo "S3_KEY=$KEY" >> $GITHUB_ENV
+
+      - name: Create EB version
+        run: |
+          VER="build-${{ steps.vars.outputs.TAG }}"
+          aws elasticbeanstalk create-application-version \
+            --application-name $EB_APP_NAME \
+            --version-label $VER \
+            --source-bundle S3Bucket=${{ steps.s3info.outputs.BUCKET }},S3Key=$S3_KEY
+          echo "VER=$VER" >> $GITHUB_ENV
+
+      - name: Deploy to EB
+        run: |
+          aws elasticbeanstalk update-environment \
+            --environment-name $EB_ENV_NAME \
+            --version-label $VER
