@@ -9,6 +9,7 @@ env:
   EB_APP_NAME: ${{ secrets.EB_APP_NAME }}
   EB_ENV_NAME: ${{ secrets.EB_ENV_NAME }}
   DOCKER_IMAGE_NAME: ${{ secrets.DOCKER_IMAGE_NAME }}
+  CLEAN_NAME: india-forecaster   # safe folder name
 
 jobs:
   deploy:
@@ -36,9 +37,14 @@ jobs:
           docker push ${{ steps.vars.outputs.IMAGE }}
           docker push ${{ secrets.DOCKER_IMAGE_NAME }}:latest
 
+      - name: Install jq
+        run: sudo apt-get install jq -y
+
       - name: Prepare Dockerrun file
         run: |
           sed "s|__TAG__|${{ steps.vars.outputs.TAG }}|g" Dockerrun.aws.json.tpl > Dockerrun.aws.json
+          echo "Validating JSON..."
+          jq empty Dockerrun.aws.json
           zip app.zip Dockerrun.aws.json
 
       - name: Configure AWS credentials
@@ -51,12 +57,12 @@ jobs:
       - name: Get EB S3 bucket
         id: s3info
         run: |
-          ACC=$(aws sts get-caller-identity --query Account --output text)
+          ACC=$(aws sts.get-caller-identity --query Account --output text)
           echo "BUCKET=elasticbeanstalk-${AWS_REGION}-${ACC}" >> $GITHUB_OUTPUT
 
       - name: Upload to S3
         run: |
-          KEY="${EB_APP_NAME}/deploy-${{ steps.vars.outputs.TAG }}.zip"
+          KEY="${CLEAN_NAME}/deploy-${{ steps.vars.outputs.TAG }}.zip"
           echo "Uploading to s3://${{ steps.s3info.outputs.BUCKET }}/$KEY"
           aws s3 cp app.zip "s3://${{ steps.s3info.outputs.BUCKET }}/$KEY"
           echo "S3_KEY=$KEY" >> $GITHUB_ENV
@@ -64,6 +70,7 @@ jobs:
       - name: Create EB version
         run: |
           VER="build-${{ steps.vars.outputs.TAG }}"
+          echo "Creating EB app version $VER"
           aws elasticbeanstalk create-application-version \
             --application-name "${EB_APP_NAME}" \
             --version-label "$VER" \
@@ -72,7 +79,7 @@ jobs:
 
       - name: Deploy to EB
         run: |
+          echo "Deploying EB version $VER"
           aws elasticbeanstalk update-environment \
             --environment-name "${EB_ENV_NAME}" \
             --version-label "$VER"
-
