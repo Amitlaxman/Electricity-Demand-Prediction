@@ -57,7 +57,7 @@ jobs:
       - name: Get EB S3 bucket
         id: s3info
         run: |
-          ACC=$(aws sts.get-caller-identity --query Account --output text)
+          ACC=$(aws sts get-caller-identity --query Account --output text)
           echo "BUCKET=elasticbeanstalk-${AWS_REGION}-${ACC}" >> $GITHUB_OUTPUT
 
       - name: Upload to S3
