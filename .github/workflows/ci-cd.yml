@@ -40,19 +40,18 @@ jobs:
           echo "global:" >> .elasticbeanstalk/config.yml
           echo "  region: ${AWS_REGION}" >> .elasticbeanstalk/config.yml
 
+      - name: Initialize EB CLI
+        run: |
+          eb init $EB_APP_NAME \
+            --platform "Docker running on 64bit Amazon Linux 2" \
+            --region $AWS_REGION \
+            --quiet
+
       - name: Set EB environment
-        run: eb use $EB_ENV_NAME
+        run: eb use $EB_ENV_NAME --quiet
 
       - name: Zip app for EB
         run: zip -r app.zip . -x "*.git*" "node_modules/*" ".github/*" "*.md"
-
-      - name: Deploy to Elastic Beanstalk
-        run: eb deploy --staged --timeout 30
-
-
-      - name: Smoke test Docker build
-        run: docker build .
-
 
       - name: Deploy to Elastic Beanstalk
         run: eb deploy --staged --timeout 30
