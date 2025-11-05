@@ -44,7 +44,13 @@ jobs:
           sed "s|__TAG__|${{ steps.vars.outputs.TAG }}|g" Dockerrun.aws.json.tpl > Dockerrun.aws.json
           echo "Validating Dockerrun JSON..."
           jq empty Dockerrun.aws.json
+
+          echo "====== Dockerrun.aws.json ======"
+          cat Dockerrun.aws.json
+          echo "================================"
+
           zip app.zip Dockerrun.aws.json
+
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
