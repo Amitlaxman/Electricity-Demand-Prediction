@@ -43,5 +43,9 @@ jobs:
       - name: Zip app for EB
         run: zip -r app.zip . -x "*.git*" "node_modules/*" ".github/*" "*.md"
 
+      - name: Smoke test Docker build
+        run: docker build .
+
+
       - name: Deploy to Elastic Beanstalk
         run: eb deploy --staged --timeout 30
