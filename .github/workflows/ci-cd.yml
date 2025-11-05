@@ -40,8 +40,15 @@ jobs:
           echo "global:" >> .elasticbeanstalk/config.yml
           echo "  region: ${AWS_REGION}" >> .elasticbeanstalk/config.yml
 
+      - name: Set EB environment
+        run: eb use $EB_ENV_NAME
+
       - name: Zip app for EB
         run: zip -r app.zip . -x "*.git*" "node_modules/*" ".github/*" "*.md"
+
+      - name: Deploy to Elastic Beanstalk
+        run: eb deploy --staged --timeout 30
+
 
       - name: Smoke test Docker build
         run: docker build .
