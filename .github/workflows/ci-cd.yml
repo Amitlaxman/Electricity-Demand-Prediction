@@ -41,7 +41,7 @@ jobs:
 
       - name: Prepare Dockerrun file
         run: |
-          sed "s|__TAG__|${{ steps.vars.outputs.TAG }}|g" Dockerrun.aws.json.tpl > Dockerrun.aws.json
+          sed "s|__TAG__|${{ steps.vars.outputs.TAG }}|g" Dockerrun.aws.json.template > Dockerrun.aws.json
           echo "Validating Dockerrun JSON..."
           jq empty Dockerrun.aws.json
 
