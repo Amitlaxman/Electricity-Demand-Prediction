@@ -25,4 +25,4 @@ COPY --from=builder /app /app
 COPY --from=builder /usr/local/lib/python3.*/dist-packages /usr/local/lib/python3.*/dist-packages
 
 EXPOSE 8080
-CMD ["sh", "-c", "PORT=${PORT:-8080} npm start"]
+CMD ["npm", "start"]

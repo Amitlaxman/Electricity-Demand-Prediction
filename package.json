@@ -2,13 +2,13 @@
   "name": "indiaforecaster",
   "version": "0.1.0",
   "private": true,
-"scripts": {
-  "dev": "next dev --turbopack -p 9002",
-  "build": "NODE_ENV=production next build",
-  "start": "next start -p $PORT",
-  "lint": "next lint",
-  "typecheck": "tsc --noEmit"
-},
+  "scripts": {
+    "dev": "next dev --turbopack -p 9002",
+    "build": "NODE_ENV=production next build",
+    "start": "cross-env PORT=8080 next start -p 8080",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",
     "@radix-ui/react-accordion": "^1.2.3",
@@ -56,6 +56,7 @@
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "cross-env": "^10.1.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"
