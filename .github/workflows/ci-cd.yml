@@ -8,7 +8,6 @@ env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
   EB_APP_NAME: india-forecaster
   EB_ENV_NAME: india-forecaster-env
-  DOCKER_IMAGE_NAME: ${{ secrets.DOCKER_IMAGE_NAME }}
 
 jobs:
   deploy:
@@ -18,39 +17,11 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Set dynamic Docker tags
-        id: vars
+      - name: Install AWS & EB CLI
         run: |
-          SHA="${GITHUB_SHA::7}"
-          echo "TAG=$SHA" >> $GITHUB_OUTPUT
-          echo "IMAGE=${DOCKER_IMAGE_NAME}:$SHA" >> $GITHUB_OUTPUT
-
-      - name: Login to Docker Hub
-        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
-
-      - name: Build Docker image
-        run: docker build -t ${{ steps.vars.outputs.IMAGE }} -t ${{ secrets.DOCKER_IMAGE_NAME }}:latest .
-
-      - name: Push Docker image
-        run: |
-          docker push ${{ steps.vars.outputs.IMAGE }}
-          docker push ${{ secrets.DOCKER_IMAGE_NAME }}:latest
-
-      - name: Install jq
-        run: sudo apt-get install jq -y
-
-      - name: Prepare Dockerrun file
-        run: |
-          sed "s|__TAG__|${{ steps.vars.outputs.TAG }}|g" Dockerrun.aws.json.template > Dockerrun.aws.json
-          echo "Validating Dockerrun JSON..."
-          jq empty Dockerrun.aws.json
-
-          echo "====== Dockerrun.aws.json ======"
-          cat Dockerrun.aws.json
-          echo "================================"
-
-          zip app.zip Dockerrun.aws.json
-
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-pip zip
+          pip3 install awsebcli
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -59,32 +30,18 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Get EB S3 bucket
-        id: s3info
+      - name: Create EB config
         run: |
-          ACC=$(aws sts get-caller-identity --query Account --output text)
-          echo "BUCKET=elasticbeanstalk-${AWS_REGION}-${ACC}" >> $GITHUB_OUTPUT
+          mkdir -p .elasticbeanstalk
+          echo "options:" > .elasticbeanstalk/config.yml
+          echo "  platform: arn:aws:elasticbeanstalk:${AWS_REGION}::platform/Docker running on 64bit Amazon Linux 2/4.3.3" >> .elasticbeanstalk/config.yml
+          echo "  application_name: ${EB_APP_NAME}" >> .elasticbeanstalk/config.yml
+          echo "  environment_name: ${EB_ENV_NAME}" >> .elasticbeanstalk/config.yml
+          echo "global:" >> .elasticbeanstalk/config.yml
+          echo "  region: ${AWS_REGION}" >> .elasticbeanstalk/config.yml
 
-      - name: Upload Dockerrun bundle to S3
-        run: |
-          KEY="deploy-${{ steps.vars.outputs.TAG }}.zip"
-          echo "Uploading to s3://${{ steps.s3info.outputs.BUCKET }}/$KEY"
-          aws s3 cp app.zip "s3://${{ steps.s3info.outputs.BUCKET }}/$KEY"
-          echo "S3_KEY=$KEY" >> $GITHUB_ENV
-
-      - name: Create EB Application Version
-        run: |
-          VER="build-${{ steps.vars.outputs.TAG }}"
-          echo "Creating EB version $VER"
-          aws elasticbeanstalk create-application-version \
-            --application-name "${EB_APP_NAME}" \
-            --version-label "$VER" \
-            --source-bundle S3Bucket="${{ steps.s3info.outputs.BUCKET }}",S3Key="$S3_KEY"
-          echo "VER=$VER" >> $GITHUB_ENV
+      - name: Zip app for EB
+        run: zip -r app.zip . -x "*.git*" "node_modules/*" ".github/*" "*.md"
 
       - name: Deploy to Elastic Beanstalk
-        run: |
-          echo "Deploying version $VER to EB env ${EB_ENV_NAME}"
-          aws elasticbeanstalk update-environment \
-            --environment-name "${EB_ENV_NAME}" \
-            --version-label "$VER"
+        run: eb deploy --staged --timeout 30
