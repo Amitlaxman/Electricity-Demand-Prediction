@@ -6,10 +6,9 @@ on:
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
-  EB_APP_NAME: ${{ secrets.EB_APP_NAME }}
-  EB_ENV_NAME: ${{ secrets.EB_ENV_NAME }}
+  EB_APP_NAME: india-forecaster
+  EB_ENV_NAME: india-forecaster-env
   DOCKER_IMAGE_NAME: ${{ secrets.DOCKER_IMAGE_NAME }}
-  CLEAN_NAME: india-forecaster   # safe folder name
 
 jobs:
   deploy:
@@ -32,7 +31,7 @@ jobs:
       - name: Build Docker image
         run: docker build -t ${{ steps.vars.outputs.IMAGE }} -t ${{ secrets.DOCKER_IMAGE_NAME }}:latest .
 
-      - name: Push Docker image to Docker Hub
+      - name: Push Docker image
         run: |
           docker push ${{ steps.vars.outputs.IMAGE }}
           docker push ${{ secrets.DOCKER_IMAGE_NAME }}:latest
@@ -43,7 +42,7 @@ jobs:
       - name: Prepare Dockerrun file
         run: |
           sed "s|__TAG__|${{ steps.vars.outputs.TAG }}|g" Dockerrun.aws.json.tpl > Dockerrun.aws.json
-          echo "Validating JSON..."
+          echo "Validating Dockerrun JSON..."
           jq empty Dockerrun.aws.json
           zip app.zip Dockerrun.aws.json
 
@@ -60,26 +59,26 @@ jobs:
           ACC=$(aws sts get-caller-identity --query Account --output text)
           echo "BUCKET=elasticbeanstalk-${AWS_REGION}-${ACC}" >> $GITHUB_OUTPUT
 
-      - name: Upload to S3
+      - name: Upload Dockerrun bundle to S3
         run: |
-          KEY="${CLEAN_NAME}/deploy-${{ steps.vars.outputs.TAG }}.zip"
+          KEY="deploy-${{ steps.vars.outputs.TAG }}.zip"
           echo "Uploading to s3://${{ steps.s3info.outputs.BUCKET }}/$KEY"
           aws s3 cp app.zip "s3://${{ steps.s3info.outputs.BUCKET }}/$KEY"
           echo "S3_KEY=$KEY" >> $GITHUB_ENV
 
-      - name: Create EB version
+      - name: Create EB Application Version
         run: |
           VER="build-${{ steps.vars.outputs.TAG }}"
-          echo "Creating EB app version $VER"
+          echo "Creating EB version $VER"
           aws elasticbeanstalk create-application-version \
             --application-name "${EB_APP_NAME}" \
             --version-label "$VER" \
             --source-bundle S3Bucket="${{ steps.s3info.outputs.BUCKET }}",S3Key="$S3_KEY"
           echo "VER=$VER" >> $GITHUB_ENV
 
-      - name: Deploy to EB
+      - name: Deploy to Elastic Beanstalk
         run: |
-          echo "Deploying EB version $VER"
+          echo "Deploying version $VER to EB env ${EB_ENV_NAME}"
           aws elasticbeanstalk update-environment \
             --environment-name "${EB_ENV_NAME}" \
             --version-label "$VER"
