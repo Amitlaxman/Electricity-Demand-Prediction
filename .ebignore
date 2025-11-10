@@ -6,3 +6,6 @@ models/
 *.log
 *.tar.gz
 *.zip
+.github
+Dockerfile
+.md

@@ -1,4 +1,4 @@
-name: CI/CD to Elastic Beanstalk
+name: CI/CD to Elastic Beanstalk (AL2023)
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Set dynamic Docker tags
+      - name: Set Docker tag
         id: vars
         run: |
           SHA="${GITHUB_SHA::7}"
@@ -36,14 +36,14 @@ jobs:
           docker push ${{ steps.vars.outputs.IMAGE }}
           docker push ${{ secrets.DOCKER_IMAGE_NAME }}:latest
 
-      - name: Install jq
-        run: sudo apt-get install jq -y
-
-      - name: Prepare Dockerrun + ZIP
+      - name: Prepare EB Bundle
         run: |
-          sed "s|__TAG__|${{ steps.vars.outputs.TAG }}|g" Dockerrun.aws.json.template > Dockerrun.aws.json
-          jq empty Dockerrun.aws.json
-          zip app.zip Dockerrun.aws.json -x Dockerfile
+          mkdir bundle
+          mkdir -p bundle/.platform/hooks/predeploy
+          cp -r .platform bundle/ || true
+          cp Dockerfile bundle/ || true
+          echo "TAG=${{ steps.vars.outputs.TAG }}" > bundle/.env
+          zip -r app.zip bundle
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -58,7 +58,7 @@ jobs:
           ACC=$(aws sts get-caller-identity --query Account --output text)
           echo "BUCKET=elasticbeanstalk-${AWS_REGION}-${ACC}" >> $GITHUB_OUTPUT
 
-      - name: Upload Dockerrun bundle to S3
+      - name: Upload bundle to S3
         run: |
           KEY="deploy-${{ steps.vars.outputs.TAG }}.zip"
           aws s3 cp app.zip "s3://${{ steps.s3info.outputs.BUCKET }}/$KEY"
